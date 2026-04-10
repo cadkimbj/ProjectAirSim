@@ -43,6 +43,19 @@ This is useful, for example, when running **non-physics "computer vision" mode**
 }
 ```
 
+#### #3 - Use an external host loop to drive sim time
+
+Use the `external-driven` clock when another runtime is responsible for advancing the simulation loop.
+
+This mode works for Unreal integration, other engines, or even custom headless runners that want to feed elapsed frame or step time into Project AirSim while keeping deterministic fixed sim steps.
+
+```json
+"clock": {
+  "type": "external-driven",
+  "step-ns": 3000000
+}
+```
+
 ---
 
 Copyright (C) Microsoft Corporation.  

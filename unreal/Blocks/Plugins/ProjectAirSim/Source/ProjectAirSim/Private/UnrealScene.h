@@ -116,8 +116,8 @@ class AUnrealScene : public AActor {
 
   TimeNano unreal_time;
   bool using_unreal_physics;
-  bool using_unreal_driven_clock = false;
-  microsoft::projectairsim::UnrealDrivenClock* unreal_driven_clock_ =
+    bool using_external_driven_clock = false;
+    microsoft::projectairsim::ExternalDrivenClock* external_driven_clock_ =
       nullptr;
 
   std::unique_ptr<WorldSimApi> world_api;

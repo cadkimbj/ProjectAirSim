@@ -161,48 +161,51 @@ void SteppableClock::Step() {
 }
 
 // -----------------------------------------------------------------------------
-// UnrealDrivenClock
+// ExternalDrivenClock
 
-UnrealDrivenClock::UnrealDrivenClock(TimeNano fixed_step_nanos, TimeNano start)
+ExternalDrivenClock::ExternalDrivenClock(TimeNano fixed_step_nanos,
+                                         TimeNano start)
     : current_sim_time_(start), accumulated_nanos_(0) {
   // Fixed-step size used to convert variable frame deltas into deterministic
   // simulation steps.
   fixed_step_nanos_ = std::max(fixed_step_nanos, kMinStepNanos);
 }
 
-UnrealDrivenClock::~UnrealDrivenClock() {}
+ExternalDrivenClock::~ExternalDrivenClock() {}
 
-TimeNano UnrealDrivenClock::NowSimNanos() const { return current_sim_time_; }
+TimeNano ExternalDrivenClock::NowSimNanos() const {
+  return current_sim_time_;
+}
 
-void UnrealDrivenClock::BeginFrame(TimeNano delta_nanos) {
-  // Unreal provides elapsed real time per frame; accumulate it and consume
-  // later in fixed-size steps during Step().
+void ExternalDrivenClock::BeginFrame(TimeNano delta_nanos) {
+  // The external host provides elapsed real time per frame; accumulate it and
+  // consume later in fixed-size steps during Step().
   if (delta_nanos <= 0) {
     return;
   }
   accumulated_nanos_.fetch_add(delta_nanos);
 }
 
-void UnrealDrivenClock::BeginFrame(TimeSec delta_seconds) {
+void ExternalDrivenClock::BeginFrame(TimeSec delta_seconds) {
   BeginFrame(SecToNanos(delta_seconds));
 }
 
-bool UnrealDrivenClock::HasPendingStep() const {
+bool ExternalDrivenClock::HasPendingStep() const {
   // At least one full fixed-step can be executed.
   return accumulated_nanos_.load() >= fixed_step_nanos_.load();
 }
 
-void UnrealDrivenClock::SetFixedStep(TimeNano fixed_step_nanos) {
+void ExternalDrivenClock::SetFixedStep(TimeNano fixed_step_nanos) {
   // Allow runtime tuning of physics/update frequency in nanoseconds.
   fixed_step_nanos_ = std::max(fixed_step_nanos, kMinStepNanos);
 }
 
-TimeNano UnrealDrivenClock::GetRemainderNanos() const {
+TimeNano ExternalDrivenClock::GetRemainderNanos() const {
   // Remaining fractional frame time that has not reached one full step yet.
   return accumulated_nanos_.load();
 }
 
-void UnrealDrivenClock::Step() {
+void ExternalDrivenClock::Step() {
   // Consume exactly one fixed step so callers can iterate in a while loop.
   if (!HasPendingStep()) {
     return;

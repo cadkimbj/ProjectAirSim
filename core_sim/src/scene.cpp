@@ -587,8 +587,8 @@ void Scene::Impl::StartSceneTick() {
 
   sim_time_ = SimClock::Get()->NowSimNanos();
 
-  // Unreal-driven clock mode runs SceneTick() from Unreal's Tick loop.
-  if (clock_settings_.type == ClockType::kUnrealDriven) {
+  // External-driven clock mode runs SceneTick() from a host loop.
+  if (clock_settings_.type == ClockType::kExternalDriven) {
     return;
   }
 
@@ -608,7 +608,7 @@ void Scene::Impl::StopSceneTick() {
     stop_physics_func();
   }
 
-  if (clock_settings_.type != ClockType::kUnrealDriven) {
+  if (clock_settings_.type != ClockType::kExternalDriven) {
     executor_.Stop();
   }
 }
@@ -651,8 +651,8 @@ std::string Scene::Impl::SimGetClockType() {
       return Constant::Config::steppable;
     case ClockType::kRealTime:
       return Constant::Config::real_time;
-    case ClockType::kUnrealDriven:
-      return Constant::Config::unreal_driven;
+    case ClockType::kExternalDriven:
+      return Constant::Config::external_driven;
     default:
       return "unknown";
   }
@@ -1078,9 +1078,9 @@ void Scene::Loader::LoadSceneWithJSON(const json& json) {
     if (impl_.clock_settings_.pause_on_start) {
       SimClock::Get()->SimPause(true);
     }
-  } else if (impl_.clock_settings_.type == ClockType::kUnrealDriven) {
+    } else if (impl_.clock_settings_.type == ClockType::kExternalDriven) {
     SimClock::Get(
-        std::make_shared<UnrealDrivenClock>(impl_.clock_settings_.step));
+      std::make_shared<ExternalDrivenClock>(impl_.clock_settings_.step));
   } else {
     // Default to steppable clock
     SimClock::Get(std::make_shared<SteppableClock>());
@@ -1201,8 +1201,8 @@ void Scene::Loader::LoadClockSettings(const json& json) {
       impl_.clock_settings_.type = ClockType::kSteppable;
     } else if (clock_type == Constant::Config::real_time) {
       impl_.clock_settings_.type = ClockType::kRealTime;
-    } else if (clock_type == Constant::Config::unreal_driven) {
-      impl_.clock_settings_.type = ClockType::kUnrealDriven;
+    } else if (clock_type == Constant::Config::external_driven) {
+      impl_.clock_settings_.type = ClockType::kExternalDriven;
     } else {
       impl_.logger_.LogWarning(
           impl_.name_,

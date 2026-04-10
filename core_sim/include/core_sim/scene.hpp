@@ -76,8 +76,8 @@ class Scene {
 
   const ClockSettings& GetClockSettings() const;
 
-  // Run a single simulation tick from an external loop (for Unreal-driven
-  // clock mode where scene ticks are not run on ScheduledExecutor thread).
+    // Run a single simulation tick from an external loop (for external-driven
+    // clock mode where scene ticks are not run on ScheduledExecutor thread).
   bool ExternalTick();
 
   const SegmentationSettings& GetSegmentationSettings() const;

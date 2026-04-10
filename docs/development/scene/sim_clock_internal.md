@@ -76,6 +76,19 @@ This is useful, for example, when running in a **non-physics "computer vision" m
 }
 ```
 
+#### #5 - Drive the clock from an external runtime
+
+Use `external-driven` when a host runtime is responsible for invoking scene ticks and supplying elapsed time.
+
+This keeps Project AirSim usable with Unreal, other engines, or standalone orchestrators without tying the clock model to a specific engine name.
+
+```json
+"clock": {
+  "type": "external-driven",
+  "step-ns": 3000000
+}
+```
+
 ---
 
 Copyright (C) Microsoft Corporation.  

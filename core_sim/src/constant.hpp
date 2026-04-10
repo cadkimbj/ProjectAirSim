@@ -84,7 +84,7 @@ class Constant {
     static constexpr const char* clock = "clock";
     static constexpr const char* steppable = "steppable";
     static constexpr const char* real_time = "real-time";
-    static constexpr const char* unreal_driven = "unreal-driven";
+    static constexpr const char* external_driven = "external-driven";
     static constexpr const char* type = "type";
     static constexpr const char* robot = "robot";
     static constexpr const char* env_actor = "env_actor";

@@ -126,20 +126,21 @@ class SteppableClock : public ClockBase {
 };
 
 // -----------------------------------------------------------------------------
-// UnrealDrivenClock
+// ExternalDrivenClock
 
-class UnrealDrivenClock : public ClockBase {
+class ExternalDrivenClock : public ClockBase {
  public:
   static constexpr TimeNano kMinStepNanos = 1;
 
-  explicit UnrealDrivenClock(
+  explicit ExternalDrivenClock(
       TimeNano fixed_step_nanos = ClockBase::kDefaultStepNanos,
       TimeNano start = 0);
-  ~UnrealDrivenClock() override;
+  ~ExternalDrivenClock() override;
 
   TimeNano NowSimNanos() const override;
 
-  // Called from the Unreal loop to add real frame time to the accumulator.
+  // Called from an external host loop to add elapsed frame time to the
+  // accumulator.
   void BeginFrame(TimeNano delta_nanos);
   void BeginFrame(TimeSec delta_seconds);
 
@@ -178,7 +179,7 @@ class SimClock {  // TODO Avoid factory singleton pattern?
 // -----------------------------------------------------------------------------
 // Clock Settings
 
-enum class ClockType { kSteppable = 0, kRealTime = 1, kUnrealDriven = 2 };
+enum class ClockType { kSteppable = 0, kRealTime = 1, kExternalDriven = 2 };
 
 struct ClockSettings {
   ClockType type = ClockType::kSteppable;
