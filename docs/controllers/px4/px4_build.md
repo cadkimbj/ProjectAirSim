@@ -20,7 +20,7 @@ Now to build it you will need the right tools.
 
 ## PX4 build tools
 
-The full instructions are available on the [dev.px4.io](https://docs.px4.io/master/en/dev_setup/building_px4.html) website,
+The full instructions are available on the [dev.px4.io](https://docs.px4.io/v1.12/en/dev_setup/building_px4.html) website,
 but we've copied the relevant subset of those instructions here for your convenience.
 
 ## Build SITL version

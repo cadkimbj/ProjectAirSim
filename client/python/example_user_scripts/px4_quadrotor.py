@@ -63,7 +63,6 @@ async def main(scenefile):
         )
 
         image_display.start()
-
         # ------------------------------------------------------------------------------
 
         # Set the drone to be ready to fly
@@ -121,12 +120,12 @@ async def main(scenefile):
 
 
 if __name__ == "__main__":
-    scene_files = {"hitl": "scene_px4_hitl.jsonc", "sitl": "scene_px4_sitl.jsonc"}
+    scene_files = {"hitl": "scene_px4_hitl.jsonc", "sitl": "scene_px4_sitl.jsonc", "sitl_wsl2": "scene_px4_sitl_wsl2.jsonc"}
 
     parser = argparse.ArgumentParser(description="Basic drone exercise with PX4.")
     parser.add_argument(
         "mode",
-        choices=["hitl", "sitl"],
+        choices=["hitl", "sitl", "sitl_wsl2"],
         nargs="?",
         help=(
             'the PX4 configuration: "hitl" for hardware-in-the loop (hardware via'
