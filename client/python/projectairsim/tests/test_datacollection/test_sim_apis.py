@@ -83,6 +83,19 @@ def test_env_actor_spawning_correct_locations(
     # Test wether env actors are being properly setup
     for location_name in geo_locations.keys():
         location = geo_locations.get(location_name)
+
+        if location.name == "Blocks-planned":
+            # Only Blocks-planned adds this actor through the data API,
+            # because that scenario depends on configuration generated at runtime.
+            data_generator.add_env_actor_to_location(
+                location_name=location.name,
+                actor_name="TestEnvActor",
+                trajectory_preset_name="EnvActor-trajectory",
+                duration=10,
+                to_loop=True,
+                time_offset=0,
+            )
+
         world, env_actor = helper.setup_env_actor(client, world, location)
 
         if (

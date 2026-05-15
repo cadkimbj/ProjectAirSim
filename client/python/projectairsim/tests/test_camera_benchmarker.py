@@ -15,6 +15,10 @@ import warnings
 import cv2
 
 
+BENCHMARK_IMAGE_TIMEOUT_SEC = 30
+BENCHMARK_CANCEL_TIMEOUT_SEC = 5
+
+
 class CameraBenchmarker:
     def __init__(self, image_mode: str, tgt_num_images: int):
         self.tgt_num_images = tgt_num_images
@@ -53,6 +57,26 @@ class CameraBenchmarker:
                 f"{self.num_images} {self.image_mode} images"
             )
 
+    async def wait_for_target_images(self, poll_interval: float = 0.01):
+        deadline = time.time() + BENCHMARK_IMAGE_TIMEOUT_SEC
+        while self.num_images < self.tgt_num_images:
+            if time.time() >= deadline:
+                raise AssertionError(
+                    "Timed out waiting for "
+                    f"{self.tgt_num_images} {self.image_mode} images; "
+                    f"received {self.num_images}"
+                )
+            await asyncio.sleep(poll_interval)
+
+    async def cancel_and_wait_for_move_task(self, move_task):
+        self.projectairsim_drone.cancel_last_task()
+        try:
+            await asyncio.wait_for(move_task, timeout=BENCHMARK_CANCEL_TIMEOUT_SEC)
+        except asyncio.TimeoutError as err:
+            raise AssertionError(
+                "Timed out waiting for cancelled benchmark move task to finish"
+            ) from err
+
     async def run_benchmark_pubsub(self):
         # Subscribe to images
         if self.image_mode == "rgb":
@@ -73,14 +97,12 @@ class CameraBenchmarker:
             v_north=0.0, v_east=0.0, v_down=-1.0, duration=300
         )
 
-        while self.num_images < self.tgt_num_images:
-            await asyncio.sleep(0.01)
-
-        # Unsubscribe to images
-        self.projectairsim_client.unsubscribe(image_topic)
-
-        self.projectairsim_drone.cancel_last_task()
-        await move_task  # join awaited move_by_velocity_async Task now that it's cancelled
+        try:
+            await self.wait_for_target_images()
+        finally:
+            # Unsubscribe and cancel even when the benchmark times out.
+            self.projectairsim_client.unsubscribe(image_topic)
+            await self.cancel_and_wait_for_move_task(move_task)
 
     async def run_benchmark_reqrep(self):
         # Command the Drone to move "Up" in NED coordinate system for a long time
@@ -88,12 +110,21 @@ class CameraBenchmarker:
             v_north=0.0, v_east=0.0, v_down=-1.0, duration=300
         )
 
-        while self.num_images < self.tgt_num_images:
-            images = self.projectairsim_drone.get_images("DownCamera", [ImageType.SCENE])
-            self.process_image(images[ImageType.SCENE])
-
-        self.projectairsim_drone.cancel_last_task()
-        await move_task  # join awaited move_by_velocity_async Task now that it's cancelled
+        deadline = time.time() + BENCHMARK_IMAGE_TIMEOUT_SEC
+        try:
+            while self.num_images < self.tgt_num_images:
+                if time.time() >= deadline:
+                    raise AssertionError(
+                        "Timed out waiting for "
+                        f"{self.tgt_num_images} {self.image_mode} images; "
+                        f"received {self.num_images}"
+                    )
+                images = self.projectairsim_drone.get_images(
+                    "DownCamera", [ImageType.SCENE]
+                )
+                self.process_image(images[ImageType.SCENE])
+        finally:
+            await self.cancel_and_wait_for_move_task(move_task)
 
     def cleanup(self):
         self.projectairsim_drone.disarm()
@@ -108,16 +139,17 @@ async def image_benchmark_main(image_mode, transport_mode, tgt_num_images):
     )
     benchmarker.initialize()
 
-    if transport_mode == "pubsub":
-        await benchmarker.run_benchmark_pubsub()
-    elif transport_mode == "reqrep":
-        await benchmarker.run_benchmark_reqrep()
-    else:
-        warnings.warn("Invalid transport mode.")
-        return
-
-    benchmarker.cleanup()
-    return benchmarker
+    try:
+        if transport_mode == "pubsub":
+            await benchmarker.run_benchmark_pubsub()
+        elif transport_mode == "reqrep":
+            await benchmarker.run_benchmark_reqrep()
+        else:
+            warnings.warn("Invalid transport mode.")
+            return
+        return benchmarker
+    finally:
+        benchmarker.cleanup()
 
 
 def print_benchmark_result(benchmarker, image_mode, transport_mode):
