@@ -40,4 +40,15 @@ else
   # Fix UE's generated game target binary names from UnrealGame to the project name in launch.json
   sed -i "s/UnrealGame-/$PROJECT_NAME-/g" .vscode/launch.json
   sed -i "s/UnrealGame\"/$PROJECT_NAME\"/g" .vscode/launch.json
+
+  # Add Project AirSim Python debugging entries to UE-generated VS Code files.
+  if command -v python3 >/dev/null 2>&1
+  then
+    python3 "$SCRIPTDIR/../../tools/update_blocks_vscode.py" --blocks-dir "$SCRIPTDIR"
+  elif command -v python >/dev/null 2>&1
+  then
+    python "$SCRIPTDIR/../../tools/update_blocks_vscode.py" --blocks-dir "$SCRIPTDIR"
+  else
+    echo "WARNING: python was not found, skipping Project AirSim Python VS Code debug configuration."
+  fi
 fi

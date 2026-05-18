@@ -37,4 +37,12 @@ Unreal engine's root folder path, ex. C:\Program Files\Epic Games\UE_5.0
     echo !s! >> .vscode\airsimlaunch.json
   )
   move .vscode\airsimlaunch.json .vscode\launch.json
+
+  REM Add Project AirSim Python debugging entries to UE-generated VS Code files.
+  where python >nul 2>nul
+  if !ERRORLEVEL! == 0 (
+    python "%~dp0..\..\tools\update_blocks_vscode.py" --blocks-dir "%~dp0."
+  ) else (
+    echo:WARNING: python was not found, skipping Project AirSim Python VS Code debug configuration.
+  )
 )
