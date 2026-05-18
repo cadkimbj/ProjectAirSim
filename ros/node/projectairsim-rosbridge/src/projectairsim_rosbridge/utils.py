@@ -229,9 +229,9 @@ def to_ros_point(projectairsim_vector):
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
     return rosgeommsg.Point(
-        x=projectairsim_vector["x"],
-        y=-projectairsim_vector["y"],
-        z=-projectairsim_vector["z"],
+        x=float(projectairsim_vector["x"]),
+        y=float(-projectairsim_vector["y"]),
+        z=float(-projectairsim_vector["z"]),
     )
 
 
@@ -241,9 +241,9 @@ def to_ros_position_list(projectairsim_vector):
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
     return (
-        projectairsim_vector["x"],
-        -projectairsim_vector["y"],
-        -projectairsim_vector["z"],
+        float(projectairsim_vector["x"]),
+        float(-projectairsim_vector["y"]),
+        float(-projectairsim_vector["z"]),
     )
 
 
@@ -252,7 +252,11 @@ def to_ros_position_list2list(projectairsim_list):
     Convert a vector from Project AirSim orientation (RHS, X-forward, Y-right, Z-down)
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
-    return (projectairsim_list[0], -projectairsim_list[1], -projectairsim_list[2])
+    return (
+        float(projectairsim_list[0]),
+        float(-projectairsim_list[1]),
+        float(-projectairsim_list[2]),
+    )
 
 
 def to_ros_position_vector3(projectairsim_vector):
@@ -261,9 +265,9 @@ def to_ros_position_vector3(projectairsim_vector):
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
     return rosgeommsg.Vector3(
-        x=projectairsim_vector["x"],
-        y=-projectairsim_vector["y"],
-        z=-projectairsim_vector["z"],
+        x=float(projectairsim_vector["x"]),
+        y=float(-projectairsim_vector["y"]),
+        z=float(-projectairsim_vector["z"]),
     )
 
 
@@ -273,10 +277,10 @@ def to_ros_quaternion(projectairsim_quaternion):
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
     return rosgeommsg.Quaternion(
-        x=projectairsim_quaternion["x"],
-        y=-projectairsim_quaternion["y"],
-        z=-projectairsim_quaternion["z"],
-        w=projectairsim_quaternion["w"],
+        x=float(projectairsim_quaternion["x"]),
+        y=float(-projectairsim_quaternion["y"]),
+        z=float(-projectairsim_quaternion["z"]),
+        w=float(projectairsim_quaternion["w"]),
     )
 
 
@@ -286,10 +290,10 @@ def to_ros_quaternion_list(projectairsim_quaternion):
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
     return (
-        projectairsim_quaternion["x"],
-        -projectairsim_quaternion["y"],
-        -projectairsim_quaternion["z"],
-        projectairsim_quaternion["w"],
+        float(projectairsim_quaternion["x"]),
+        float(-projectairsim_quaternion["y"]),
+        float(-projectairsim_quaternion["z"]),
+        float(projectairsim_quaternion["w"]),
     )
 
 
@@ -299,8 +303,8 @@ def to_ros_quaternion_list2list(projectairsim_list):
     to ROS orientation (RHS, X-forward, Y-left, Z-up)
     """
     return (
-        projectairsim_list[0],
-        -projectairsim_list[1],
-        -projectairsim_list[2],
-        projectairsim_list[3],
+        float(projectairsim_list[0]),
+        float(-projectairsim_list[1]),
+        float(-projectairsim_list[2]),
+        float(projectairsim_list[3]),
     )
