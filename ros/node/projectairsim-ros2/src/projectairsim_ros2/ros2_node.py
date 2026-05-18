@@ -283,6 +283,9 @@ class ROS2Node(node.ROSNode):
     def get_time_from_msg(self, header_stamp):
         return rclpy.time.Time.from_msg(header_stamp)
 
+    def get_time_from_timestamp_ns(self, timestamp_ns):
+        return rclpy.time.Time(nanoseconds=int(timestamp_ns))
+
     def get_time_to_msg(self, timestamp):
         return rclpy.time.Time.to_msg(timestamp)
 

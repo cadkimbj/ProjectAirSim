@@ -63,7 +63,9 @@ class MsgConverter:
             (return) - Corresponding ROS Pose message
         """
         posestamped = rosgeommsg.PoseStamped()
-        posestamped.header.stamp = self.ros_node.get_time_now_msg()
+        posestamped.header.stamp = self._get_stamp_from_projectairsim_msg(
+            projectairsim_pose
+        )
         # posestamped.header.frame_id is set by PoseBridgeToROS
 
         posestamped.pose.position = utils.to_ros_point(projectairsim_pose["position"])
@@ -85,7 +87,9 @@ class MsgConverter:
             (return) - Corresponding ROS FluidPressure message
         """
         fluid_pressure = rossensmsg.FluidPressure()
-        fluid_pressure.header = self._get_standard_ros_header(projectairsim_topic_name)
+        fluid_pressure.header = self._get_standard_ros_header(
+            projectairsim_topic_name, projectairsim_msg
+        )
 
         fluid_pressure.fluid_pressure = projectairsim_msg["pressure"]
         fluid_pressure.variance = 0.0
@@ -124,7 +128,9 @@ class MsgConverter:
             (return) - Corresponding ROS NavSatFix message
         """
         nav_sat_fix = rossensmsg.NavSatFix()
-        nav_sat_fix.header = self._get_standard_ros_header(projectairsim_topic_name)
+        nav_sat_fix.header = self._get_standard_ros_header(
+            projectairsim_topic_name, projectairsim_msg
+        )
 
         nav_sat_fix.status.status = (
             rossensmsg.NavSatStatus.STATUS_SBAS_FIX
@@ -179,7 +185,9 @@ class MsgConverter:
             (return) - Corresponding ROS Image message
         """
         image = rossensmsg.Image()
-        image.header.stamp = self.ros_node.get_time_now_msg()
+        image.header.stamp = self._get_stamp_from_projectairsim_msg(
+            projectairsim_image_bgr8
+        )
         # image.header.frame_id must be set by caller
 
         # Get image parameters
@@ -208,7 +216,9 @@ class MsgConverter:
             (return) - Corresponding ROS Image message
         """
         image = rossensmsg.Image()
-        image.header.stamp = self.ros_node.get_time_now_msg()
+        image.header.stamp = self._get_stamp_from_projectairsim_msg(
+            projectairsim_image_16uc1
+        )
         # image.header.frame_id must be set by caller
 
         # Get image parameters
@@ -241,7 +251,9 @@ class MsgConverter:
             (return) - Corresponding ROS Imu message
         """
         imu = rossensmsg.Imu()
-        imu.header = self._get_standard_ros_header(projectairsim_topic_name)
+        imu.header = self._get_standard_ros_header(
+            projectairsim_topic_name, projectairsim_msg
+        )
 
         imu.orientation = utils.to_ros_quaternion(projectairsim_msg["orientation"])
         imu.orientation_covariance = self.NO_COVARIANCE_MATRIX
@@ -282,7 +294,7 @@ class MsgConverter:
 
         # Create PointCloud2 message from 3D point array
         header = rosstdmsg.Header()
-        header.stamp = self.ros_node.get_time_now_msg()
+        header.stamp = self._get_stamp_from_projectairsim_msg(projectairsim_lidar)
         header.frame_id = projectairsim_lidar["frame_id"]
         pointcloud2 = self.ros_node.PointCloud2.create_cloud_xyz32(header, points)
 
@@ -330,7 +342,9 @@ class MsgConverter:
             (return) - Corresponding ROS MagneticField message
         """
         magnetic_field = rossensmsg.MagneticField()
-        magnetic_field.header = self._get_standard_ros_header(projectairsim_topic_name)
+        magnetic_field.header = self._get_standard_ros_header(
+            projectairsim_topic_name, projectairsim_msg
+        )
 
         magnetic_field.magnetic_field = utils.to_ros_position_vector3(
             projectairsim_msg["magnetic_field_body"]
@@ -358,7 +372,9 @@ class MsgConverter:
             (return) - Corresponding ROS RadarScan message
         """
         radarscan = rosradarmsg.RadarScan()
-        radarscan.header = self._get_standard_ros_header(projectairsim_topic_name)
+        radarscan.header = self._get_standard_ros_header(
+            projectairsim_topic_name, projectairsim_radar_detections
+        )
 
         radar_returns = radarscan.returns
         rdProjectAirSim = projectairsim_radar_detections["radar_detections"]
@@ -409,7 +425,9 @@ class MsgConverter:
             (return) - Corresponding ROS RadarTracks message
         """
         radartracks = rosradarmsg.RadarTracks()
-        radartracks.header = self._get_standard_ros_header(projectairsim_topic_name)
+        radartracks.header = self._get_standard_ros_header(
+            projectairsim_topic_name, projectairsim_radar_track
+        )
 
         tracks = radartracks.tracks
         rdProjectAirSim = projectairsim_radar_track["radar_tracks"]
@@ -447,13 +465,25 @@ class MsgConverter:
         """
         self.robot_base_frame_ids = robot_base_frame_ids
 
-    def _get_standard_ros_header(self, projectairsim_topic_name: str):
+    def _get_stamp_from_projectairsim_msg(self, projectairsim_msg):
         """
-        Returns a ROS header with the current ROS node's timestamp and the
+        Returns a ROS timestamp from Project AirSim sim time, with a wall-clock
+        fallback for messages that do not provide a simulation timestamp.
+        """
+        if "time_stamp" in projectairsim_msg:
+            return self.ros_node.get_time_msg_from_timestamp_ns(
+                projectairsim_msg["time_stamp"]
+            )
+
+        return self.ros_node.get_time_now_msg()
+
+    def _get_standard_ros_header(self, projectairsim_topic_name: str, projectairsim_msg):
+        """
+        Returns a ROS header with the Project AirSim message timestamp and the
         frame ID set to the corresponding robot base's transform frame ID
         """
         header = rosstdmsg.Header()
-        header.stamp = self.ros_node.get_time_now_msg()
+        header.stamp = self._get_stamp_from_projectairsim_msg(projectairsim_msg)
         header.frame_id = self.robot_base_frame_ids[
             projectairsim_topic_name
         ]

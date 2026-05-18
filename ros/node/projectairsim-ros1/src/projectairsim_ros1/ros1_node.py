@@ -165,6 +165,10 @@ class ROS1Node(node.ROSNode):
     def get_time_now(self):
         return rospy.Time.now()
 
+    def get_time_from_timestamp_ns(self, timestamp_ns):
+        timestamp_ns = int(timestamp_ns)
+        return rospy.Time(timestamp_ns // 1000000000, timestamp_ns % 1000000000)
+
     def get_time_to_msg(self, timestamp):
         return timestamp
 

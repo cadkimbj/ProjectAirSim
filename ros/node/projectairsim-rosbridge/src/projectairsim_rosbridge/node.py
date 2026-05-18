@@ -250,6 +250,26 @@ class ROSNode(ABC):
         return self.get_time_to_msg(self.get_time_now())
 
     @abstractmethod
+    def get_time_from_timestamp_ns(self, timestamp_ns):
+        """
+        Returns the time value from a Project AirSim nanosecond timestamp.
+
+        Returns:
+            (Return) - Time value from nanosecond timestamp
+        """
+        raise NotImplementedError()
+
+    def get_time_msg_from_timestamp_ns(self, timestamp_ns):
+        """
+        Returns the topic message header timestamp from a Project AirSim
+        nanosecond timestamp.
+
+        Returns:
+            (Return) - Message header timestamp from nanosecond timestamp
+        """
+        return self.get_time_to_msg(self.get_time_from_timestamp_ns(timestamp_ns))
+
+    @abstractmethod
     def get_time_to_msg(self, timestamp):
         """
         Returns the topic message header timestamp from the time value.

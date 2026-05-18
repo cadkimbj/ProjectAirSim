@@ -156,6 +156,7 @@ class TFBroadcaster:
         frame_id: str,
         frame_id_parent: str,
         transform: rosgeommsg.Transform = None,
+        update_mode=Frame.UPDATE_AUTO,
     ):
         """
         Adds a new frame.  This call is ignored if the frame already exists.
@@ -165,6 +166,8 @@ class TFBroadcaster:
             frame_id - Name of the frame
             frame_id - Name of the frame's parent
             transform - The initial transform of the new frame (or the identity transform if None)
+            update_mode - How to handle this frame when not updated since the
+                last broadcast pass
         """
         with self.lock_frames:
             if frame_id not in self.frames:
@@ -173,6 +176,7 @@ class TFBroadcaster:
                     frame_id_parent,
                     transform,
                     self.ros_node.get_time_to_msg(self.ros_node.get_time_now()),
+                    update_mode,
                 )
                 self.logger.info(f'Adding transform frame "{frame_id}"')
         self.event_notify.set()  # Let broadcast thread know the frame list is not empty

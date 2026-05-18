@@ -10,6 +10,7 @@ import traceback
 from typing import Dict
 
 import geometry_msgs.msg as rosgeommsg
+import rosgraph_msgs.msg as rosgraphmsg
 import sensor_msgs.msg as rossensmsg
 
 from . import utils
@@ -481,6 +482,36 @@ class TopicsManagers:
         self.ros_node = ros_node
         self.ros_topics_manager = ROSTopicsManager(ros_node, logger)
         self.tf_broadcaster = TFBroadcaster(ros_node, logger)
+        self.clock_publisher = ros_node.create_publisher(
+            topic="/clock",
+            msg_type=rosgraphmsg.Clock,
+            latch=False,
+            queue_size=10,
+        )
+        self.clock_last_timestamp_ns = None
+
+    def publish_clock_from_projectairsim_msg(self, projectairsim_msg):
+        """
+        Publish the ROS simulation clock from a Project AirSim nanosecond
+        timestamp when one is available.
+        """
+        if (
+            not isinstance(projectairsim_msg, dict)
+            or "time_stamp" not in projectairsim_msg
+        ):
+            return
+
+        timestamp_ns = int(projectairsim_msg["time_stamp"])
+        if (
+            self.clock_last_timestamp_ns is not None
+            and timestamp_ns < self.clock_last_timestamp_ns
+        ):
+            return
+
+        clock = rosgraphmsg.Clock()
+        clock.clock = self.ros_node.get_time_msg_from_timestamp_ns(timestamp_ns)
+        self.clock_publisher.publish(clock)
+        self.clock_last_timestamp_ns = timestamp_ns
 
 
 # --------------------------------------------------------------------------
@@ -692,6 +723,9 @@ class BasicBridgeToROS:
             projectairsim_message_data - Message published to the Project AirSim topic
         """
         if self.ros_topic_name:
+            self.topics_managers.publish_clock_from_projectairsim_msg(
+                projectairsim_message_data
+            )
             ros_message = self.message_callback(
                 projectairsim_topic.path, projectairsim_message_data
             )
@@ -921,7 +955,11 @@ class SensorBridgeToROS(BasicBridgeToROS):
         self.transform = (
             rosgeommsg.Transform()
         )  # Cache of sensor's last known transform for ROS
-        topics_managers.tf_broadcaster.add_frame(self.frame_id, self.frame_id_parent)
+        topics_managers.tf_broadcaster.add_frame(
+            self.frame_id,
+            self.frame_id_parent,
+            update_mode=TFBroadcaster.Frame.UPDATE_NEVER,
+        )
 
         # Initialize the super class with the sensor topic
         super().__init__(
@@ -958,6 +996,9 @@ class SensorBridgeToROS(BasicBridgeToROS):
         """
 
         if self.ros_topic_name:
+            self.topics_managers.publish_clock_from_projectairsim_msg(
+                projectairsim_message_data
+            )
             # Attach transform frame ID to message for message callback
             projectairsim_message_data["frame_id"] = self.frame_id
 
@@ -969,8 +1010,15 @@ class SensorBridgeToROS(BasicBridgeToROS):
             # Publish the sensor transform frame
             if ros_transform is not None:
                 self.transform = ros_transform
+                timevalue = None
+                if "time_stamp" in projectairsim_message_data:
+                    timevalue = (
+                        self.topics_managers.ros_node.get_time_from_timestamp_ns(
+                            projectairsim_message_data["time_stamp"]
+                        )
+                    )
                 self.topics_managers.tf_broadcaster.set_frame(
-                    self.frame_id, ros_transform
+                    self.frame_id, ros_transform, timevalue=timevalue
                 )
 
             # Generate the ROS topic message
@@ -1256,7 +1304,11 @@ class CameraBridgeToROS(BasicBridgeToROS):
         self.transform = (
             rosgeommsg.Transform()
         )  # Cache of camera's last known transform for ROS
-        topics_managers.tf_broadcaster.add_frame(self.frame_id, self.frame_id_parent)
+        topics_managers.tf_broadcaster.add_frame(
+            self.frame_id,
+            self.frame_id_parent,
+            update_mode=TFBroadcaster.Frame.UPDATE_NEVER,
+        )
 
         # Initialize the super class with the image topic
         super().__init__(
@@ -1340,6 +1392,9 @@ class CameraBridgeToROS(BasicBridgeToROS):
             projectairsim_message_data - Message published to the Project AirSim topic
         """
         if self.ros_topic_name:
+            self.topics_managers.publish_clock_from_projectairsim_msg(
+                projectairsim_message_data
+            )
             ros_image = self.message_callback(
                 projectairsim_topic.path, projectairsim_message_data
             )
@@ -1370,7 +1425,13 @@ class CameraBridgeToROS(BasicBridgeToROS):
                     projectairsim_message_data["rot_w"],
                 )
             )
-            self.topics_managers.tf_broadcaster.set_frame(self.frame_id, self.transform)
+            self.topics_managers.tf_broadcaster.set_frame(
+                self.frame_id,
+                self.transform,
+                timevalue=self.topics_managers.ros_node.get_time_from_msg(
+                    ros_image.header.stamp
+                ),
+            )
 
             self.topics_managers.ros_topics_manager.publish(
                 self.ros_topic_name_camera_image, ros_image
@@ -1401,6 +1462,9 @@ class CameraBridgeToROS(BasicBridgeToROS):
             projectairsim_message_data - Message published to the Project AirSim topic
         """
         if self.ros_topic_name:
+            self.topics_managers.publish_clock_from_projectairsim_msg(
+                projectairsim_message_data
+            )
             self._convert_projectairsim_camera_info_to_ros(projectairsim_message_data)
 
             if not self._auto_subscriber.is_subscribed:
@@ -1418,7 +1482,16 @@ class CameraBridgeToROS(BasicBridgeToROS):
             projectairsim_topic - Project AirSim topic info
             projectairsim_camera_info - Project AirSim camera info topic message
         """
-        self.camera_info.header.stamp = self.topics_managers.ros_node.get_time_now_msg()
+        if "time_stamp" in projectairsim_camera_info:
+            self.camera_info.header.stamp = (
+                self.topics_managers.ros_node.get_time_msg_from_timestamp_ns(
+                    projectairsim_camera_info["time_stamp"]
+                )
+            )
+        else:
+            self.camera_info.header.stamp = (
+                self.topics_managers.ros_node.get_time_now_msg()
+            )
         self.camera_info.header.frame_id = self.frame_id
 
         self.camera_info.width = projectairsim_camera_info["width"]
@@ -1634,7 +1707,11 @@ class RobotPoseBridgeToROS(BasicBridgeToROS):
                 )
 
         # Add the transform frame
-        topics_managers.tf_broadcaster.add_frame(self.frame_id, self.frame_id_parent)
+        topics_managers.tf_broadcaster.add_frame(
+            self.frame_id,
+            self.frame_id_parent,
+            update_mode=TFBroadcaster.Frame.UPDATE_NEVER,
+        )
 
         # Subscribe to Project AirSim topic now since we need to constantly update the transform frame
         self._auto_subscriber.subscribe()
@@ -1665,6 +1742,9 @@ class RobotPoseBridgeToROS(BasicBridgeToROS):
             projectairsim_message_data - Message published to the Project AirSim topic
         """
         if self.ros_topic_name:
+            self.topics_managers.publish_clock_from_projectairsim_msg(
+                projectairsim_message_data
+            )
             posestamped = self.message_callback(
                 projectairsim_topic.path, projectairsim_message_data
             )
