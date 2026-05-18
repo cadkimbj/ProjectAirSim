@@ -3,6 +3,6 @@
   "cmake.generator": "Ninja",
   "python.formatting.provider": "black",
   "python.analysis.extraPaths": [
-    "client/python"
+    "client/python/projectairsim/src"
   ]
 }
