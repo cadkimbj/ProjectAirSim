@@ -87,7 +87,7 @@ class World(object):
         """Get sim clock type
 
         Returns:
-            string: the sim clock type ("steppable" or "real-time")
+            string: the sim clock type ("steppable", "real-time", "engine-driven", or "external-clock")
         """
         sim_clock_type_req: Dict = {
             "method": f"{self.parent_topic}/GetSimClockType",
@@ -1031,7 +1031,7 @@ class World(object):
                 )
             else:
                 projectairsim_log().warn(
-                    "For real-time clock types, assets cannot be spawned before starting the sim clock."
+                    "For non-steppable clock types, assets cannot be spawned before starting the sim clock."
                 )
 
         sim_config_data = commentjson.dumps(scene_config_dict)

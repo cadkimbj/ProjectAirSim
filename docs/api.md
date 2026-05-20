@@ -127,7 +127,7 @@ For Unreal objects, the `object_name` refers to the object ID which can be found
 
 ### Sim Clock API
 
-- [`get_sim_clock_type()`]() - Get the current sim clock's type (**steppable** or **real-time**).
+- [`get_sim_clock_type()`]() - Get the current sim clock's type (**steppable**, **real-time**, **engine-driven**, or **external-clock**).
 - [`get_sim_time()`]() - Get the sim clock's current sim time in nanosec.
 - [`pause()`]() - Pause the advancement of sim time.
 - [`resume()`]() - Resume the advancement of sim time.

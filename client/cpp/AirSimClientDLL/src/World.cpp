@@ -580,7 +580,7 @@ Status World::Impl::LoadScene(const json& json_scene_config,
       if (json_scene_working.contains("spawn-objects")) {
         if (!fclock_is_steppable)
           log.Warning(
-              "For real-time clock types, assets cannot be spawned before "
+              "For non-steppable clock types, assets cannot be spawned before "
               "starting the sim clock.");
         else {
           json_clock["pause-on-start"] = true;

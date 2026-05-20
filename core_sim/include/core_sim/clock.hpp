@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <system_error>
 #include <thread>
@@ -125,6 +126,44 @@ class SteppableClock : public ClockBase {
 };
 
 // -----------------------------------------------------------------------------
+// EngineDrivenClock
+
+class EngineDrivenClock : public ClockBase {
+ public:
+  static constexpr TimeNano kMinStepNanos = 1;
+
+  explicit EngineDrivenClock(
+      TimeNano fixed_step_nanos = ClockBase::kDefaultStepNanos,
+      TimeNano start = 0);
+  ~EngineDrivenClock() override;
+
+  TimeNano NowSimNanos() const override;
+
+  // Called from an external host loop to add elapsed frame time to the
+  // accumulator.
+  void AccumulateStep(TimeNano delta_nanos);
+  void AccumulateStep(TimeSec delta_seconds);
+
+  // True when enough accumulated real time exists for at least one sim step.
+  bool HasPendingStep() const;
+
+  void SetFixedStep(TimeNano fixed_step_nanos);
+
+ protected:
+  void Step() override;
+
+ private:
+    // Current sim time is advanced in fixed steps by Step() as accumulated real
+    // time allows.
+    std::atomic<TimeNano> current_sim_time_;
+    // Fixed-step size used to convert variable frame deltas into deterministic
+    // simulation steps.
+    std::atomic<TimeNano> fixed_step_nanos_;
+    // Accumulated real time from external host frames that has not yet been consumed into sim time steps.
+    std::atomic<TimeNano> accumulated_nanos_;
+};
+
+// -----------------------------------------------------------------------------
 // SimClock
 
 class SimClock {  // TODO Avoid factory singleton pattern?
@@ -144,7 +183,12 @@ class SimClock {  // TODO Avoid factory singleton pattern?
 // -----------------------------------------------------------------------------
 // Clock Settings
 
-enum class ClockType { kSteppable = 0, kRealTime = 1 };
+enum class ClockType {
+  kSteppable = 0,
+  kRealTime = 1,
+  kEngineDriven = 2,
+  kExternalClock = 3
+};
 
 struct ClockSettings {
   ClockType type = ClockType::kSteppable;

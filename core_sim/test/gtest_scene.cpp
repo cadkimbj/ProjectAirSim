@@ -134,6 +134,70 @@ TEST(Scene, GetActors) {
   EXPECT_EQ(scene.GetActors().size(), 0);
 }
 
+TEST(Scene, LoadExternalClock) {
+  json json = R"({
+    "id": "a",
+    "clock": {
+      "type": "external-clock",
+      "step-ns": 3000000
+    }
+  })"_json;
+
+  auto scene = projectairsim::Simulator::MakeScene();
+  projectairsim::Simulator::LoadScene(scene, json);
+
+  EXPECT_EQ(scene.GetClockSettings().type, projectairsim::ClockType::kExternalClock);
+  EXPECT_EQ(scene.GetClockSettings().step, 3000000);
+}
+
+TEST(Scene, LoadSteppableClock) {
+  json json = R"({
+    "id": "a",
+    "clock": {
+      "type": "steppable",
+      "step-ns": 2900000
+    }
+  })"_json;
+
+  auto scene = projectairsim::Simulator::MakeScene();
+  projectairsim::Simulator::LoadScene(scene, json);
+
+  EXPECT_EQ(scene.GetClockSettings().type, projectairsim::ClockType::kSteppable);
+  EXPECT_EQ(scene.GetClockSettings().step, 2900000);
+}
+
+TEST(Scene, LoadRealTimeClock) {
+  json json = R"({
+    "id": "a",
+    "clock": {
+      "type": "real-time",
+      "step-ns": 2800000
+    }
+  })"_json;
+
+  auto scene = projectairsim::Simulator::MakeScene();
+  projectairsim::Simulator::LoadScene(scene, json);
+
+  EXPECT_EQ(scene.GetClockSettings().type, projectairsim::ClockType::kRealTime);
+  EXPECT_EQ(scene.GetClockSettings().step, 2800000);
+}
+
+TEST(Scene, LoadEngineDrivenClock) {
+  json json = R"({
+    "id": "a",
+    "clock": {
+      "type": "engine-driven",
+      "step-ns": 2700000
+    }
+  })"_json;
+
+  auto scene = projectairsim::Simulator::MakeScene();
+  projectairsim::Simulator::LoadScene(scene, json);
+
+  EXPECT_EQ(scene.GetClockSettings().type, projectairsim::ClockType::kEngineDriven);
+  EXPECT_EQ(scene.GetClockSettings().step, 2700000);
+}
+
 // TODO Add tests for scene
 // TEST(Scene, SetCallbackPhysicsSetWrenches) {}
 // TEST(Scene, SetCallbackPhysicsStep) {}

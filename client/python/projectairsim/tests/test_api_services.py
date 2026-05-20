@@ -513,11 +513,15 @@ def test_pause_resume(client):
         elif "real-time" in clock_type:
             assert "WARNING" in sim_pause_resume_state
             assert world.get_sim_time() > sim_time
+        elif "engine-driven" in clock_type:
+            assert "WARNING" in sim_pause_resume_state
 
         sim_pause_resume_state: str = world.resume()
         if "steppable" in clock_type:
             assert "resumed" in sim_pause_resume_state
         elif "real-time" in clock_type:
+            assert "WARNING" in sim_pause_resume_state
+        elif "engine-driven" in clock_type:
             assert "WARNING" in sim_pause_resume_state
         sim_time = world.get_sim_time()
         time.sleep(0.1)
@@ -535,6 +539,8 @@ def test_is_paused(client):
         if "steppable" in clock_type:
             assert world.is_paused() is True
         elif "real-time" in clock_type:
+            assert world.is_paused() is False
+        elif "engine-driven" in clock_type:
             assert world.is_paused() is False
 
         world.resume()
@@ -556,6 +562,9 @@ def test_continue_for_sim_time(client):
             assert world.get_sim_time() == sim_time + delta_time
         elif "real-time" in clock_type:
             assert world.get_sim_time() >= sim_time
+        elif "engine-driven" in clock_type:
+            # engine-driven doesn't support continue_for_sim_time
+            pass
         world.resume()
     except NNGException as err:
         raise Exception(str(err))
@@ -574,6 +583,9 @@ def test_continue_until_sim_time(client):
             assert world.get_sim_time() == target_time
         elif "real-time" in clock_type:
             assert world.get_sim_time() >= target_time
+        elif "engine-driven" in clock_type:
+            # engine-driven doesn't support continue_until_sim_time
+            pass
         world.resume()
     except NNGException as err:
         raise Exception(str(err))

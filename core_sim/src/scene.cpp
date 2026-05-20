@@ -322,6 +322,8 @@ const ClockSettings& Scene::GetClockSettings() const {
   return pimpl_->GetClockSettings();
 }
 
+bool Scene::ExternalTick() { return pimpl_->SceneTick(); }
+
 const SegmentationSettings& Scene::GetSegmentationSettings() const {
   return pimpl_->GetSegmentationSettings();
 }
@@ -583,11 +585,17 @@ void Scene::Impl::StartSceneTick() {
     start_physics_func();
   }
 
+  sim_time_ = SimClock::Get()->NowSimNanos();
+
+  // Engine-driven and external-clock modes run SceneTick() from a host loop.
+  if (clock_settings_.type == ClockType::kEngineDriven ||
+      clock_settings_.type == ClockType::kExternalClock) {
+    return;
+  }
+
   // Bind callback with implicit argument "this"
   executor_.Initialize(std::bind(&Scene::Impl::SceneTick, this),
                        clock_settings_.scene_tick_period);
-
-  sim_time_ = SimClock::Get()->NowSimNanos();
   executor_.Start();
 }
 
@@ -601,7 +609,10 @@ void Scene::Impl::StopSceneTick() {
     stop_physics_func();
   }
 
-  executor_.Stop();
+  if (clock_settings_.type != ClockType::kEngineDriven &&
+      clock_settings_.type != ClockType::kExternalClock) {
+    executor_.Stop();
+  }
 }
 
 void Scene::Impl::OnBeginUpdate() {
@@ -642,6 +653,10 @@ std::string Scene::Impl::SimGetClockType() {
       return Constant::Config::steppable;
     case ClockType::kRealTime:
       return Constant::Config::real_time;
+    case ClockType::kEngineDriven:
+      return Constant::Config::engine_driven;
+    case ClockType::kExternalClock:
+      return Constant::Config::external_clock;
     default:
       return "unknown";
   }
@@ -1067,6 +1082,10 @@ void Scene::Loader::LoadSceneWithJSON(const json& json) {
     if (impl_.clock_settings_.pause_on_start) {
       SimClock::Get()->SimPause(true);
     }
+  } else if (impl_.clock_settings_.type == ClockType::kEngineDriven ||
+             impl_.clock_settings_.type == ClockType::kExternalClock) {
+    SimClock::Get(
+        std::make_shared<EngineDrivenClock>(impl_.clock_settings_.step));
   } else {
     // Default to steppable clock
     SimClock::Get(std::make_shared<SteppableClock>());
@@ -1187,6 +1206,10 @@ void Scene::Loader::LoadClockSettings(const json& json) {
       impl_.clock_settings_.type = ClockType::kSteppable;
     } else if (clock_type == Constant::Config::real_time) {
       impl_.clock_settings_.type = ClockType::kRealTime;
+    } else if (clock_type == Constant::Config::engine_driven) {
+      impl_.clock_settings_.type = ClockType::kEngineDriven;
+    } else if (clock_type == Constant::Config::external_clock) {
+      impl_.clock_settings_.type = ClockType::kExternalClock;
     } else {
       impl_.logger_.LogWarning(
           impl_.name_,

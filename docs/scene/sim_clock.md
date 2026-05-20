@@ -43,6 +43,30 @@ This is useful, for example, when running **non-physics "computer vision" mode**
 }
 ```
 
+#### #3 - Use an engine-driven clock (host loop outside the sim scheduler)
+
+Use the `engine-driven` clock when another runtime is responsible for advancing the simulation loop and supplying elapsed time into Project AirSim while keeping deterministic fixed sim steps (`step-ns`).
+
+From the **Unreal plugin** perspective this clock mode is **engine-driven** (the sim does not run its own periodic tick); on **Unreal Engine** builds the name is the **unreal-driven-clock**: `AUnrealScene::Tick` forwards each frame’s `DeltaTime` into the engine-driven clock and drains scene ticks.
+
+```json
+"clock": {
+  "type": "engine-driven",
+  "step-ns": 3000000
+}
+```
+
+#### #4 - Use an external-clock for future external control integration
+
+Use the `external-clock` type when you want the same current behavior as `engine-driven`, but with a distinct configuration label reserved for future control of simlibs by another app or system.
+
+```json
+"clock": {
+  "type": "external-clock",
+  "step-ns": 3000000
+}
+```
+
 ---
 
 Copyright (C) Microsoft Corporation.  

@@ -76,6 +76,10 @@ class Scene {
 
   const ClockSettings& GetClockSettings() const;
 
+    // Run a single simulation tick from an external loop (for engine-driven
+    // clock mode where scene ticks are not run on ScheduledExecutor thread).
+  bool ExternalTick();
+
   const SegmentationSettings& GetSegmentationSettings() const;
 
   const bool GetVRMode() const;

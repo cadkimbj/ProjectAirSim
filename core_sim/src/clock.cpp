@@ -16,16 +16,19 @@ ClockBase::ClockBase() {}
 ClockBase::~ClockBase() {}
 
 TimeNano ClockBase::GetRealTimeSinceEpochNanos() {
+  // Use steady_clock to avoid discontinuities caused by wall-clock changes.
   return std::chrono::duration_cast<std::chrono::nanoseconds>(
              std::chrono::steady_clock::now().time_since_epoch())
       .count();
 }
 
 TimeNano ClockBase::SecToNanos(TimeSec dt_sec) {
+  // Convert seconds to integer nanoseconds used by the simulation clocks.
   return static_cast<TimeNano>(dt_sec * 1.0E9);
 }
 
 TimeSec ClockBase::NanosToSec(TimeNano dt_nanos) {
+  // Convert nanoseconds back to seconds for APIs using floating-point time.
   return static_cast<TimeSec>(dt_nanos / 1.0E9);
 }
 
@@ -87,6 +90,7 @@ void SteppableClock::SetNextStep(TimeNano amount_nanos) {
 }
 
 void SteppableClock::SetNextSimTime(TimeNano time_nanos) {
+  // Translate an absolute target time into the delta for the next Step().
   auto delta_time = static_cast<TimeNano>(time_nanos - current_sim_time_);
   next_step_nanos_ = std::max(delta_time, kMinStepNanos);
 }
@@ -145,6 +149,7 @@ void SteppableClock::ContinueForNBaseSteps(int n_base_steps) {
 }
 
 void SteppableClock::Step() {
+  // Advance only while the clock is not paused by sim_time_to_pause_.
   if (current_sim_time_ < sim_time_to_pause_) {
     // Add step (either base or pending step), then reset step amount to base
     current_sim_time_ += next_step_nanos_;
@@ -153,6 +158,57 @@ void SteppableClock::Step() {
     next_step_nanos_ =
         is_externally_stepped_only_ ? 0 : base_step_nanos_.load();
   }
+}
+
+// -----------------------------------------------------------------------------
+// EngineDrivenClock
+
+EngineDrivenClock::EngineDrivenClock(TimeNano fixed_step_nanos,
+                                         TimeNano start)
+    : current_sim_time_(start), accumulated_nanos_(0) {
+  // Fixed-step size used to convert variable frame deltas into deterministic
+  // simulation steps.
+  fixed_step_nanos_ = std::max(fixed_step_nanos, kMinStepNanos);
+}
+
+EngineDrivenClock::~EngineDrivenClock() {}
+
+TimeNano EngineDrivenClock::NowSimNanos() const {
+  return current_sim_time_;
+}
+
+void EngineDrivenClock::AccumulateStep(TimeNano delta_nanos) {
+  // The external host provides elapsed real time per frame; accumulate it and
+  // consume later in fixed-size steps during Step().
+  if (delta_nanos <= 0) {
+    return;
+  }
+  accumulated_nanos_.fetch_add(delta_nanos);
+}
+
+void EngineDrivenClock::AccumulateStep(TimeSec delta_seconds) {
+  AccumulateStep(SecToNanos(delta_seconds));
+}
+
+bool EngineDrivenClock::HasPendingStep() const {
+  // At least one full fixed-step can be executed.
+  return accumulated_nanos_.load() >= fixed_step_nanos_.load();
+}
+
+void EngineDrivenClock::SetFixedStep(TimeNano fixed_step_nanos) {
+  // Allow runtime tuning of physics/update frequency in nanoseconds.
+  fixed_step_nanos_ = std::max(fixed_step_nanos, kMinStepNanos);
+}
+
+void EngineDrivenClock::Step() {
+  // Consume exactly one fixed step so callers can iterate in a while loop.
+  if (!HasPendingStep()) {
+    return;
+  }
+
+  const TimeNano fixed_step_nanos = fixed_step_nanos_.load();
+  accumulated_nanos_.fetch_sub(fixed_step_nanos);
+  current_sim_time_.fetch_add(fixed_step_nanos);
 }
 
 // -----------------------------------------------------------------------------
@@ -208,8 +264,10 @@ void ScheduledExecutor::Start() {
   sleep_time_ave_ = 0.0f;
 
   if (th_.joinable()) {
+    // Defensive: detach any stale thread handle before creating a new worker.
     th_.detach();
   }
+  // Dedicated worker thread that periodically executes callback_.
   th_ = std::thread(&ScheduledExecutor::ExecutorLoop, this);
 }
 
@@ -237,6 +295,7 @@ bool ScheduledExecutor::IsPaused() const { return paused_; }
 bool ScheduledExecutor::IsRunning() const { return started_ && !paused_; }
 
 void ScheduledExecutor::ContinueForTime(TimeSec seconds) {
+  // Unpause temporarily and auto-pause after the requested real-time duration.
   pause_period_start_ = RealNanos();
   pause_period_ = static_cast<TimeNano>(1E9 * seconds);
   paused_ = false;
@@ -286,6 +345,7 @@ void ScheduledExecutor::InitializePauseState() {
 
 void ScheduledExecutor::ExecutorLoop() {
   while (started_) {
+    // Track loop start to maintain a consistent execution period.
     TimeNano period_start = RealNanos();
 
     if (pause_period_start_ > 0) {
@@ -320,6 +380,7 @@ void ScheduledExecutor::ExecutorLoop() {
     sleep_time_ave_ = 0.25f * sleep_time_ave_ + 0.75f * delay_nanos / 1.0E9;
 
     if (delay_nanos > 0 && started_) {
+      // Sleep the remaining budget so callback cadence matches period_nanos_.
       SleepFor(delay_nanos);
     }
   }

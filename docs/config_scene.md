@@ -73,15 +73,17 @@ The scene is loaded from the JSONC file that is specified when the `World` objec
 
 | Parameter | Value | Description |
 | --------- | ----- | ----------- |
-| `type` | `steppable`, `real-time` | Type of simulation clock. Defaults to `steppable` if omitted. |
-| `step-ns` | integer | Step size in **nanosec** for `steppable` clock. Defaults to 20000000 (20 ms) if omitted. |
-| `real-time-update-rate` | integer | Real-time execution period in **nanosec** between each simulation loop and clock update for all clock types. Defaults to 3000000 (3 ms) if omitted. |
+| `type` | `steppable`, `real-time`, `engine-driven`, `external-clock` | Type of simulation clock. Defaults to `steppable` if omitted. |
+| `step-ns` | integer | Step size in **nanosec** for `steppable`, `engine-driven`, and `external-clock` clocks. Defaults to 20000000 (20 ms) if omitted. |
+| `real-time-update-rate` | integer | Real-time execution period in **nanosec** between each simulation loop and clock update for scheduled clocks. Defaults to 3000000 (3 ms) if omitted. |
 | `pause-on-start` | bool | Flag to start with simulation paused for `steppable` clock. Defaults to false if omitted. |
 
-There are 2 supported simulation clock types:
+There are 4 supported simulation clock types:
 
 1. Steppable clock
 2. Real-time clock
+3. Engine-driven clock
+4. External-clock
 
 See below for example of how to configure each type of simulation clock.
 
@@ -116,6 +118,36 @@ The `pause-on-start` option allows the simulation to start paused to allow full-
 Real-time clock is a **variable-step clock** with sim time step = real-time step between each execution period set by `real-time-update-rate` real-time nanosecs. Since the real-time step between each execution period varies slightly by the system clock, the sim time step will also have variations.
 
 **Note:** Since `real-time` clock follows real-time advancement, it can not be paused and is not deterministic or repeatable. In order to do the simulation at a scaled multiple of real-time, use a steppable clock with the desired ratio set between `step-ns` and `real-time-update-rate` as described in the [Steppable clock](#steppable-clock) section.
+
+### Engine-driven clock
+
+``` json
+"clock": {
+  "type": "engine-driven",
+  "step-ns": 3000000
+}
+```
+
+From the **simulation libraries / plugin** perspective, this is the **engine-driven** clock: a **fixed-step clock driven by a host loop outside core_sim’s scheduled executor**. The host contributes elapsed time (via `AccumulateStep`); the simulation consumes it in deterministic steps of `step-ns`.
+
+This mode is useful when Project AirSim is embedded inside another runtime (another game engine, a custom orchestrator, etc.) that decides when scene ticks should run.
+
+**Unreal Engine (`UnrealNative` scenes):** the host loop that feeds elapsed time is the **unreal-clock** path: each Unreal engine tick supplies frame delta time into the engine-driven clock, then fixed `step-ns` scene steps are drained. So **engine-driven** (plugin/sim naming) is named there as **unreal-driven-clock** (Unreal-side naming).
+
+**Note:** `engine-driven` does not use `real-time-update-rate` to schedule scene ticks internally, and pause/resume via the SimClock client APIs is not supported for this clock type (the host loop owns pacing).
+
+### External-clock
+
+``` json
+"clock": {
+  "type": "external-clock",
+  "step-ns": 3000000
+}
+```
+
+`external-clock` currently behaves the same as `engine-driven`: it is a fixed-step host-driven clock intended to be the future entry point for driving simlibs from an external app or system.
+
+Use this type when you want to reserve the clock for an external controller while keeping the same runtime behavior as `engine-driven` today.
 
 ## Home GeoPoint settings
 
