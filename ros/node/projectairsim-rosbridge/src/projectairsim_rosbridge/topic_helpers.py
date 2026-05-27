@@ -907,6 +907,7 @@ class SensorBridgeToROS(BasicBridgeToROS):
         ros_topic_is_latching: bool = False,
         frame_id: str = None,
         frame_id_parent: str = "map",
+        additional_ros_publishers=None,
     ):
         """
         Constructor.
@@ -932,6 +933,10 @@ class SensorBridgeToROS(BasicBridgeToROS):
             frame_id - The name of the transform frame to broadcast; if None,
                 the robot name is used, derived from the Project AirSim topic name
             frame_id_parent - The name of the parent frame
+            additional_ros_publishers - Additional ROS sensor topics to publish
+                from the same Project AirSim sensor message. Each entry is a
+                dictionary with ros_topic_name, ros_message_type,
+                message_callback, and optional ros_topic_is_latching.
         """
         if not callable(message_callback):
             raise TypeError(f"message_callback is not callable: {message_callback}")
@@ -940,6 +945,12 @@ class SensorBridgeToROS(BasicBridgeToROS):
                 f"transform_message_callback is not callable: {transform_message_callback}"
             )
         self.transform_message_callback = transform_message_callback
+        self.additional_ros_publishers = additional_ros_publishers or []
+        for publisher in self.additional_ros_publishers:
+            if not callable(publisher["message_callback"]):
+                raise TypeError(
+                    f"message_callback is not callable: {publisher['message_callback']}"
+                )
 
         if ros_topic_name is None:
             ros_topic_name = projectairsim_topic_name
@@ -971,10 +982,25 @@ class SensorBridgeToROS(BasicBridgeToROS):
             ros_topic_name=ros_topic_name,
         )
 
+        for publisher in self.additional_ros_publishers:
+            topics_managers.ros_topics_manager.add_publisher(
+                topic_name=publisher["ros_topic_name"],
+                ros_message_type=publisher["ros_message_type"],
+                is_latching=publisher.get("ros_topic_is_latching", False),
+                peer_change_callback=self._auto_subscriber.peer_change_cb,
+            )
+
     def clear(self):
         """
         Stop handling messages and free resources.
         """
+        if self.additional_ros_publishers is not None:
+            for publisher in self.additional_ros_publishers:
+                self.topics_managers.ros_topics_manager.remove_publisher(
+                    publisher["ros_topic_name"], self._auto_subscriber.peer_change_cb
+                )
+            self.additional_ros_publishers = None
+
         super().clear()
 
         if self.frame_id is not None:
@@ -1030,6 +1056,15 @@ class SensorBridgeToROS(BasicBridgeToROS):
             self.topics_managers.ros_topics_manager.publish(
                 self.ros_topic_name, ros_sensor_message
             )
+
+            for publisher in self.additional_ros_publishers:
+                ros_sensor_message = publisher["message_callback"](
+                    projectairsim_topic.path, projectairsim_message_data
+                )
+                if ros_sensor_message is not None:
+                    self.topics_managers.ros_topics_manager.publish(
+                        publisher["ros_topic_name"], ros_sensor_message
+                    )
 
 
 # --------------------------------------------------------------------------

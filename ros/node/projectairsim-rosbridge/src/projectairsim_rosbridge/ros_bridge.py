@@ -18,7 +18,7 @@ from projectairsim import ProjectAirSimClient
 from projectairsim.utils import projectairsim_log
 
 from . import utils
-from .msg_converter import MsgConverter
+from .msg_converter import LIVOX_CUSTOM_MSG_AVAILABLE, LivoxCustomMsg, MsgConverter
 from .node import ROSNode
 from .topic_helpers import (
     BasicBridgeToROS,
@@ -216,6 +216,16 @@ class ProjectAirSimROSBridge:
         # TODO: make dynamic limits class or rosparam?
 
         self.msg_converter = MsgConverter(ros_node)  # Topic message converter
+        additional_lidar_ros_publishers = []
+        if LIVOX_CUSTOM_MSG_AVAILABLE:
+            additional_lidar_ros_publishers.append(
+                {
+                    "ros_topic_name": "/livox/lidar",
+                    "ros_message_type": LivoxCustomMsg,
+                    "message_callback": self.msg_converter.convert_lidar_to_livox_custom_msg,
+                    "ros_topic_is_latching": False,
+                }
+            )
 
         # List of Project AirSim topics we'll bridge to ROS.  Each Project AirSim
         # topic name is matched against this list in this order and the first
@@ -243,6 +253,14 @@ class ProjectAirSimROSBridge:
                 rossensmsg.FluidPressure,
                 topic_handler_type=BasicBridgeToROS,
                 message_callback=self.msg_converter.convert_barometer_to_ros,
+                ros_topic_is_latching=False,
+            ),
+            self.TopicEntry(
+                self.TopicEntry.MatchType.ENDS_WITH,
+                "/distance_sensor",
+                rossensmsg.Range,
+                topic_handler_type=BasicBridgeToROS,
+                message_callback=self.msg_converter.convert_distance_sensor_to_ros,
                 ros_topic_is_latching=False,
             ),
             self.TopicEntry(
@@ -298,6 +316,7 @@ class ProjectAirSimROSBridge:
                 topic_handler_type=SensorBridgeToROS,
                 message_callback=self.msg_converter.convert_lidar_to_ros,
                 transform_message_callback=self.msg_converter.convert_lidar_to_ros_transform,
+                additional_ros_publishers=additional_lidar_ros_publishers,
                 ros_topic_is_latching=False,
             ),
             self.TopicEntry(
@@ -376,6 +395,12 @@ class ProjectAirSimROSBridge:
             self.logger = projectairsim_log()
         else:
             self.logger = logger
+
+        if not LIVOX_CUSTOM_MSG_AVAILABLE:
+            self.logger.warning(
+                "livox_ros_driver2 is not available; /livox/lidar CustomMsg "
+                "publisher will not be advertised."
+            )
 
         # Create and connect to Project AirSim client if one wasn't given
         if self.projectairsim_client is not None:
