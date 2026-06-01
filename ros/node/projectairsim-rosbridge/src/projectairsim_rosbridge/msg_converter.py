@@ -61,7 +61,7 @@ class MsgConverter:
             {}
         )  # Mapping from Project AirSim topic name to robot's base transform frame ID
         self._last_lidar_stamp_sec_by_topic = {}
-        self._last_livox_lidar_stamp_sec_by_topic = {}
+        self._last_livox_lidar_stamp_ns_by_topic = {}
 
     def convert_actual_pose_to_ros(self, projectairsim_topic_name, projectairsim_pose):
         """
@@ -399,7 +399,7 @@ class MsgConverter:
         This is intended for ROS2 pipelines that consume
         livox_ros_driver2/msg/CustomMsg, such as FAST-LIVO2's Livox input path.
         Project AirSim does not carry per-ray timestamps, so offset_time is
-        approximated from each laser ring's point order within the scan.
+        approximated from the point's sample order within its laser line.
 
         Arguments:
             projectairsim_topic_name - The Project AirSim topic name
@@ -417,14 +417,13 @@ class MsgConverter:
         num_points = len(point_cloud_airsim) // 3
 
         timestamp_ns = projectairsim_lidar.get("time_stamp")
-        scan_duration_sec = self._get_lidar_scan_duration_sec(
-            self._last_livox_lidar_stamp_sec_by_topic,
+        scan_duration_ns = self._get_lidar_scan_duration_ns(
+            self._last_livox_lidar_stamp_ns_by_topic,
             projectairsim_topic_name,
             timestamp_ns,
         )
-        scan_duration_us = max(scan_duration_sec * 1.0e6, 0.0)
-        offset_times_us = self._get_livox_offset_times_us(
-            ring_cloud, num_points, scan_duration_us
+        offset_times_ns = self._get_livox_offset_times_ns(
+            ring_cloud, num_points, scan_duration_ns
         )
 
         livox_msg = LivoxCustomMsg()
@@ -441,7 +440,7 @@ class MsgConverter:
         for point_index, i in enumerate(range(0, num_points * 3, 3)):
             point = LivoxCustomPoint()
             point.offset_time = self._clamp_int(
-                offset_times_us[point_index], 0, 0xFFFFFFFF
+                offset_times_ns[point_index], 0, 0xFFFFFFFF
             )
             point.x = float(point_cloud_airsim[i])
             point.y = float(-point_cloud_airsim[i + 1])
@@ -459,7 +458,7 @@ class MsgConverter:
             )
             points.append(point)
 
-        livox_msg.points = points
+        livox_msg.points = sorted(points, key=lambda point: point.offset_time)
 
         return livox_msg
 
@@ -473,7 +472,7 @@ class MsgConverter:
         return cls._clamp_int((intensity / 1.4) * 255.0, 0, 255)
 
     @staticmethod
-    def _get_livox_offset_times_us(ring_cloud, num_points, scan_duration_us):
+    def _get_livox_offset_times_ns(ring_cloud, num_points, scan_duration_ns):
         if num_points <= 0:
             return []
 
@@ -483,44 +482,44 @@ class MsgConverter:
                 ring = int(ring_cloud[point_index])
                 ring_counts[ring] = ring_counts.get(ring, 0) + 1
 
+            max_ring_count = max(ring_counts.values())
+            if max_ring_count <= 1:
+                return [0.0] * num_points
+
             ring_seen = {}
-            offset_times_us = []
+            offset_times_ns = []
             for point_index in range(num_points):
                 ring = int(ring_cloud[point_index])
-                ring_index = ring_seen.get(ring, 0)
-                ring_seen[ring] = ring_index + 1
-                ring_count = ring_counts[ring]
-                offset_time_us = (
-                    scan_duration_us * ring_index / (ring_count - 1)
-                    if ring_count > 1
-                    else 0.0
+                sample_index = ring_seen.get(ring, 0)
+                ring_seen[ring] = sample_index + 1
+                offset_times_ns.append(
+                    scan_duration_ns * sample_index / (max_ring_count - 1)
                 )
-                offset_times_us.append(offset_time_us)
 
-            return offset_times_us
+            return offset_times_ns
 
         return [
-            scan_duration_us * point_index / (num_points - 1)
+            scan_duration_ns * point_index / (num_points - 1)
             if num_points > 1
             else 0.0
             for point_index in range(num_points)
         ]
 
     @staticmethod
-    def _get_lidar_scan_duration_sec(
-        last_timestamp_sec_by_topic, projectairsim_topic_name, timestamp_ns
+    def _get_lidar_scan_duration_ns(
+        last_timestamp_ns_by_topic, projectairsim_topic_name, timestamp_ns
     ):
-        timestamp_sec = timestamp_ns * 1.0e-9 if timestamp_ns is not None else None
-        last_timestamp_sec = last_timestamp_sec_by_topic.get(projectairsim_topic_name)
-        scan_duration_sec = (
-            max(timestamp_sec - last_timestamp_sec, 0.0)
-            if timestamp_sec is not None and last_timestamp_sec is not None
-            else 0.0
+        timestamp_ns = int(timestamp_ns) if timestamp_ns is not None else None
+        last_timestamp_ns = last_timestamp_ns_by_topic.get(projectairsim_topic_name)
+        scan_duration_ns = (
+            max(timestamp_ns - last_timestamp_ns, 0)
+            if timestamp_ns is not None and last_timestamp_ns is not None
+            else 0
         )
-        if timestamp_sec is not None:
-            last_timestamp_sec_by_topic[projectairsim_topic_name] = timestamp_sec
+        if timestamp_ns is not None:
+            last_timestamp_ns_by_topic[projectairsim_topic_name] = timestamp_ns
 
-        return scan_duration_sec
+        return scan_duration_ns
 
     def convert_lidar_to_ros_transform(
         self, projectairsim_topic_name, projectairsim_msg

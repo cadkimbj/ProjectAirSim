@@ -640,6 +640,7 @@ class BasicBridgeToROS:
         message_callback,
         ros_topic_name: str = None,
         ros_topic_is_latching: bool = True,
+        ros_peer_change_callback=None,
     ):
         """
         Constructor.
@@ -653,6 +654,7 @@ class BasicBridgeToROS:
             message_callback - Message handler callback function
             ros_topic_name - Name of the ROS topic if different from projectairsim_topic_name
             ros_topic_is_latching - If true, new subscribers of the ROS topic receive the last message published
+            ros_peer_change_callback - Optional callback for ROS subscriber count changes
         """
         if not callable(message_callback):
             raise TypeError(f"message_callback is not callable: {message_callback}")
@@ -671,13 +673,18 @@ class BasicBridgeToROS:
             self._projectairsim_topic_update_cb,
             topics_managers.projectairsim_topics_manager,
         )
+        self._ros_peer_change_callback = (
+            ros_peer_change_callback
+            if ros_peer_change_callback is not None
+            else self._auto_subscriber.peer_change_cb
+        )
 
         # Advertise the ROS topic
         topics_managers.ros_topics_manager.add_publisher(
             topic_name=ros_topic_name,
             ros_message_type=ros_message_type,
             is_latching=ros_topic_is_latching,
-            peer_change_callback=self._auto_subscriber.peer_change_cb,
+            peer_change_callback=self._ros_peer_change_callback,
         )
 
     def __del__(self):
@@ -700,10 +707,11 @@ class BasicBridgeToROS:
             ros_topic_name = self.ros_topic_name
             self.ros_topic_name = None
             self.topics_managers.ros_topics_manager.remove_publisher(
-                ros_topic_name, self._auto_subscriber.peer_change_cb
+                ros_topic_name, self._ros_peer_change_callback
             )
 
         self._auto_subscriber = None
+        self._ros_peer_change_callback = None
         self.topics_manager = None
         self.message_callback = None
 
@@ -973,6 +981,7 @@ class SensorBridgeToROS(BasicBridgeToROS):
         )
 
         # Initialize the super class with the sensor topic
+        self._ros_peer_counts = {}
         super().__init__(
             projectairsim_topic_name=projectairsim_topic_name,
             ros_message_type=ros_message_type,
@@ -980,6 +989,7 @@ class SensorBridgeToROS(BasicBridgeToROS):
             message_callback=message_callback,
             ros_topic_is_latching=ros_topic_is_latching,
             ros_topic_name=ros_topic_name,
+            ros_peer_change_callback=self._aggregate_peer_change_cb,
         )
 
         for publisher in self.additional_ros_publishers:
@@ -987,7 +997,7 @@ class SensorBridgeToROS(BasicBridgeToROS):
                 topic_name=publisher["ros_topic_name"],
                 ros_message_type=publisher["ros_message_type"],
                 is_latching=publisher.get("ros_topic_is_latching", False),
-                peer_change_callback=self._auto_subscriber.peer_change_cb,
+                peer_change_callback=self._aggregate_peer_change_cb,
             )
 
     def clear(self):
@@ -997,9 +1007,10 @@ class SensorBridgeToROS(BasicBridgeToROS):
         if self.additional_ros_publishers is not None:
             for publisher in self.additional_ros_publishers:
                 self.topics_managers.ros_topics_manager.remove_publisher(
-                    publisher["ros_topic_name"], self._auto_subscriber.peer_change_cb
+                    publisher["ros_topic_name"], self._aggregate_peer_change_cb
                 )
             self.additional_ros_publishers = None
+        self._ros_peer_counts = {}
 
         super().clear()
 
@@ -1047,17 +1058,20 @@ class SensorBridgeToROS(BasicBridgeToROS):
                     self.frame_id, ros_transform, timevalue=timevalue
                 )
 
-            # Generate the ROS topic message
-            ros_sensor_message = self.message_callback(
-                projectairsim_topic.path, projectairsim_message_data
-            )
+            if self._has_ros_peers(self.ros_topic_name):
+                # Generate the ROS topic message
+                ros_sensor_message = self.message_callback(
+                    projectairsim_topic.path, projectairsim_message_data
+                )
 
-            # Publish the ROS topic data
-            self.topics_managers.ros_topics_manager.publish(
-                self.ros_topic_name, ros_sensor_message
-            )
+                # Publish the ROS topic data
+                self.topics_managers.ros_topics_manager.publish(
+                    self.ros_topic_name, ros_sensor_message
+                )
 
             for publisher in self.additional_ros_publishers:
+                if not self._has_ros_peers(publisher["ros_topic_name"]):
+                    continue
                 ros_sensor_message = publisher["message_callback"](
                     projectairsim_topic.path, projectairsim_message_data
                 )
@@ -1065,6 +1079,16 @@ class SensorBridgeToROS(BasicBridgeToROS):
                     self.topics_managers.ros_topics_manager.publish(
                         publisher["ros_topic_name"], ros_sensor_message
                     )
+
+    def _aggregate_peer_change_cb(self, ros_topic_name: str, num_peers: int):
+        self._ros_peer_counts[ros_topic_name] = max(num_peers, 0)
+        total_num_peers = sum(self._ros_peer_counts.values())
+        self._auto_subscriber.peer_change_cb(
+            self.projectairsim_topic_name, total_num_peers
+        )
+
+    def _has_ros_peers(self, ros_topic_name: str):
+        return self._ros_peer_counts.get(ros_topic_name, 0) > 0
 
 
 # --------------------------------------------------------------------------
