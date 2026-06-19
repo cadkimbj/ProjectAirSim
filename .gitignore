@@ -376,3 +376,6 @@ env/
 # Simulink cache
 **/slprj
 *.slxc
+.codex
+unreal/Blocks/Samples/PixelStreaming/WebServers/get_ps_servers.bat
+unreal/Blocks/Samples/PixelStreaming/WebServers/get_ps_servers.sh

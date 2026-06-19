@@ -18,7 +18,7 @@ from projectairsim import ProjectAirSimClient
 from projectairsim.utils import projectairsim_log
 
 from . import utils
-from .msg_converter import LIVOX_CUSTOM_MSG_AVAILABLE, LivoxCustomMsg, MsgConverter
+from .msg_converter import MsgConverter
 from .node import ROSNode
 from .topic_helpers import (
     BasicBridgeToROS,
@@ -217,15 +217,17 @@ class ProjectAirSimROSBridge:
 
         self.msg_converter = MsgConverter(ros_node)  # Topic message converter
         additional_lidar_ros_publishers = []
-        if LIVOX_CUSTOM_MSG_AVAILABLE:
-            additional_lidar_ros_publishers.append(
-                {
-                    "ros_topic_name": "/livox/lidar",
-                    "ros_message_type": LivoxCustomMsg,
-                    "message_callback": self.msg_converter.convert_lidar_to_livox_custom_msg,
-                    "ros_topic_is_latching": False,
-                }
-            )
+        # Livox CustomMsg publishing is disabled. Keep only the default
+        # Project AirSim lidar -> ROS PointCloud2 bridge.
+        # if LIVOX_CUSTOM_MSG_AVAILABLE:
+        #     additional_lidar_ros_publishers.append(
+        #         {
+        #             "ros_topic_name": "/livox/lidar",
+        #             "ros_message_type": LivoxCustomMsg,
+        #             "message_callback": self.msg_converter.convert_lidar_to_livox_custom_msg,
+        #             "ros_topic_is_latching": False,
+        #         }
+        #     )
 
         # List of Project AirSim topics we'll bridge to ROS.  Each Project AirSim
         # topic name is matched against this list in this order and the first
@@ -269,6 +271,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
             self.TopicEntry(
@@ -277,6 +280,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
             self.TopicEntry(
@@ -285,6 +289,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
             self.TopicEntry(
@@ -299,6 +304,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
             self.TopicEntry(
@@ -349,6 +355,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
             self.TopicEntry(
@@ -357,6 +364,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
             self.TopicEntry(
@@ -365,6 +373,7 @@ class ProjectAirSimROSBridge:
                 rossensmsg.Image,
                 topic_handler_type=CameraBridgeToROS,
                 image_message_callback=self.msg_converter.convert_image_to_ros,
+                compressed_image_message_callback=self.msg_converter.convert_image_png_to_ros_compressed,
                 desired_pose_message_callback=self.msg_converter.convert_desired_pose_from_ros,
             ),
         ]
@@ -396,11 +405,11 @@ class ProjectAirSimROSBridge:
         else:
             self.logger = logger
 
-        if not LIVOX_CUSTOM_MSG_AVAILABLE:
-            self.logger.warning(
-                "livox_ros_driver2 is not available; /livox/lidar CustomMsg "
-                "publisher will not be advertised."
-            )
+        # if not LIVOX_CUSTOM_MSG_AVAILABLE:
+        #     self.logger.warning(
+        #         "livox_ros_driver2 is not available; /livox/lidar CustomMsg "
+        #         "publisher will not be advertised."
+        #     )
 
         # Create and connect to Project AirSim client if one wasn't given
         if self.projectairsim_client is not None:

@@ -1097,7 +1097,7 @@ class CameraBridgeToROS(BasicBridgeToROS):
     Based on BasicBridgeToROS, this class handles publishing ROS topics
     for a camera image type received from Project AirSim.  The external
     message handler callback function converts from the Project AirSim image
-    message to the ROS geometry_msgs.Image message.
+    message to ROS sensor_msgs.Image or sensor_msgs.CompressedImage messages.
 
     This class subscribes to two Project AirSim topics, subscribes to a ROS
     topic for the camera pose, publishes three ROS topics for the camera info,
@@ -1300,6 +1300,7 @@ class CameraBridgeToROS(BasicBridgeToROS):
         ros_message_type,
         topics_managers: TopicsManagers,
         image_message_callback,
+        compressed_image_message_callback,
         desired_pose_message_callback,
         ros_topic_is_latching: bool = False,
         frame_id: str = None,
@@ -1311,6 +1312,9 @@ class CameraBridgeToROS(BasicBridgeToROS):
         "image_message_callback" converts the image from the Project AirSim topic
         message to an ROS image message.  It can return None if it handles the
         the Project AirSim message entirely by itself.
+
+        "compressed_image_message_callback" converts a compressed Project AirSim
+        image message to a ROS compressed image message.
 
         "desired_pose_message_callback" converts the ROS topic message into an
         Project AirSim PoseMessage structure like that for the robot's
@@ -1324,6 +1328,7 @@ class CameraBridgeToROS(BasicBridgeToROS):
 
         Class-Specific Arguments:
             image_message_callback - Image message handler callback function (inherited from BasicBridgeToROS)
+            compressed_image_message_callback - Compressed image message handler callback function
             desired_pose_message_callback - Pose message handler callback function
             ros_topic_is_latching - If true, new subscribers of the ROS topic
                 receive the last message published  (inherited from BasicBridgeToROS)
@@ -1334,6 +1339,11 @@ class CameraBridgeToROS(BasicBridgeToROS):
         if not callable(image_message_callback):
             raise TypeError(
                 f"image_message_callback is not callable: {image_message_callback}"
+            )
+        if not callable(compressed_image_message_callback):
+            raise TypeError(
+                "compressed_image_message_callback is not callable: "
+                f"{compressed_image_message_callback}"
             )
         if not callable(desired_pose_message_callback):
             raise TypeError(
@@ -1351,6 +1361,10 @@ class CameraBridgeToROS(BasicBridgeToROS):
         self.ros_topic_name_camera_image = (
             projectairsim_topic_name + "/image"
         )  # ROS topic name for camera image
+        self.ros_topic_name_camera_image_compressed = (
+            self.ros_topic_name_camera_image + "/compressed"
+        )
+        self.compressed_image_message_callback = compressed_image_message_callback
 
         # Setup the camera transform frame
         if frame_id is not None:
@@ -1369,7 +1383,10 @@ class CameraBridgeToROS(BasicBridgeToROS):
             update_mode=TFBroadcaster.Frame.UPDATE_NEVER,
         )
 
-        # Initialize the super class with the image topic
+        # Initialize the super class with the raw image topic. Aggregate peer
+        # counts so either raw or compressed subscribers activate the single
+        # Project AirSim camera subscription.
+        self._ros_peer_counts = {}
         super().__init__(
             projectairsim_topic_name=projectairsim_topic_name,
             ros_message_type=ros_message_type,
@@ -1377,6 +1394,14 @@ class CameraBridgeToROS(BasicBridgeToROS):
             message_callback=image_message_callback,
             ros_topic_is_latching=ros_topic_is_latching,
             ros_topic_name=self.ros_topic_name_camera_image,
+            ros_peer_change_callback=self._aggregate_peer_change_cb,
+        )
+
+        topics_managers.ros_topics_manager.add_publisher(
+            topic_name=self.ros_topic_name_camera_image_compressed,
+            ros_message_type=rossensmsg.CompressedImage,
+            is_latching=ros_topic_is_latching,
+            peer_change_callback=self._aggregate_peer_change_cb,
         )
 
         # Setup the camera info topic info
@@ -1410,6 +1435,14 @@ class CameraBridgeToROS(BasicBridgeToROS):
         """
         Stop handling messages and free resources.
         """
+        if self.ros_topic_name_camera_image_compressed is not None:
+            self.topics_managers.ros_topics_manager.remove_publisher(
+                self.ros_topic_name_camera_image_compressed,
+                self._aggregate_peer_change_cb,
+            )
+            self.ros_topic_name_camera_image_compressed = None
+        self._ros_peer_counts = {}
+
         super().clear()
 
         if self.frame_id is not None:
@@ -1435,6 +1468,14 @@ class CameraBridgeToROS(BasicBridgeToROS):
 
         # Drop the camera info auto-subscriber
         self.auto_subscriber_camera_info = None
+        self.compressed_image_message_callback = None
+
+    def _aggregate_peer_change_cb(self, ros_topic_name: str, num_peers: int):
+        self._ros_peer_counts[ros_topic_name] = max(num_peers, 0)
+        total_num_peers = sum(self._ros_peer_counts.values())
+        self._auto_subscriber.peer_change_cb(
+            self.projectairsim_topic_name, total_num_peers
+        )
 
     def _projectairsim_topic_update_cb(
         self, projectairsim_topic, projectairsim_message_data
@@ -1454,9 +1495,16 @@ class CameraBridgeToROS(BasicBridgeToROS):
             self.topics_managers.publish_clock_from_projectairsim_msg(
                 projectairsim_message_data
             )
-            ros_image = self.message_callback(
-                projectairsim_topic.path, projectairsim_message_data
-            )
+            if projectairsim_message_data["encoding"] == "PNG":
+                ros_image = self.compressed_image_message_callback(
+                    projectairsim_topic.path, projectairsim_message_data
+                )
+                ros_image_topic_name = self.ros_topic_name_camera_image_compressed
+            else:
+                ros_image = self.message_callback(
+                    projectairsim_topic.path, projectairsim_message_data
+                )
+                ros_image_topic_name = self.ros_topic_name_camera_image
             ros_image.header.frame_id = self.frame_id
 
             (
@@ -1493,7 +1541,7 @@ class CameraBridgeToROS(BasicBridgeToROS):
             )
 
             self.topics_managers.ros_topics_manager.publish(
-                self.ros_topic_name_camera_image, ros_image
+                ros_image_topic_name, ros_image
             )
             if (
                 self.auto_subscriber_camera_info

@@ -17,15 +17,18 @@ import numpy as np
 from . import utils
 from .node import ROSNode
 
-try:
-    from livox_ros_driver2.msg import CustomMsg as LivoxCustomMsg
-    from livox_ros_driver2.msg import CustomPoint as LivoxCustomPoint
-
-    LIVOX_CUSTOM_MSG_AVAILABLE = True
-except ImportError:
-    LivoxCustomMsg = None
-    LivoxCustomPoint = None
-    LIVOX_CUSTOM_MSG_AVAILABLE = False
+# Livox CustomMsg publishing is disabled for Project AirSim. Keep the bridge on
+# the PointCloud2 lidar path only.
+# try:
+#     from livox_ros_driver2.msg import CustomMsg as LivoxCustomMsg
+#     from livox_ros_driver2.msg import CustomPoint as LivoxCustomPoint
+#
+#     LIVOX_CUSTOM_MSG_AVAILABLE = True
+# except ImportError:
+#     LivoxCustomMsg = None
+#     LivoxCustomPoint = None
+#     LIVOX_CUSTOM_MSG_AVAILABLE = False
+LIVOX_CUSTOM_MSG_AVAILABLE = False
 
 
 class MsgConverter:
@@ -61,7 +64,7 @@ class MsgConverter:
             {}
         )  # Mapping from Project AirSim topic name to robot's base transform frame ID
         self._last_lidar_stamp_sec_by_topic = {}
-        self._last_livox_lidar_stamp_ns_by_topic = {}
+        # self._last_livox_lidar_stamp_ns_by_topic = {}
 
     def convert_actual_pose_to_ros(self, projectairsim_topic_name, projectairsim_pose):
         """
@@ -206,6 +209,25 @@ class MsgConverter:
             raise ValueError(
                 f"Can only handle image encoding BGR or 16UC1, not \"{projectairsim_image['encoding']}\""
             )
+
+    def convert_image_png_to_ros_compressed(
+        self, projectairsim_topic_name, projectairsim_image_png
+    ):
+        """Convert a Project AirSim PNG image into a ROS CompressedImage."""
+        if projectairsim_image_png["encoding"] != "PNG":
+            raise ValueError(
+                f'Can only handle PNG image encoding, not "{projectairsim_image_png["encoding"]}"'
+            )
+
+        image = rossensmsg.CompressedImage()
+        image.header.stamp = self._get_stamp_from_projectairsim_msg(
+            projectairsim_image_png
+        )
+        # image.header.frame_id must be set by caller
+        image.format = "png"
+        image.data = projectairsim_image_png["data"]
+
+        return image
 
     def convert_image_bgr8_to_ros(
         self, projectairsim_topic_name, projectairsim_image_bgr8
@@ -390,120 +412,120 @@ class MsgConverter:
 
         return pointcloud2
 
-    def convert_lidar_to_livox_custom_msg(
-        self, projectairsim_topic_name, projectairsim_lidar
-    ):
-        """
-        Convert a Project AirSim LIDAR point cloud message into a Livox CustomMsg.
-
-        This is intended for ROS2 pipelines that consume
-        livox_ros_driver2/msg/CustomMsg, such as FAST-LIVO2's Livox input path.
-        Project AirSim does not carry per-ray timestamps, so offset_time is
-        approximated from the point's sample order within its laser line.
-
-        Arguments:
-            projectairsim_topic_name - The Project AirSim topic name
-            projectairsim_lidar - The LIDAR data received from the Project AirSim topic
-
-        Returns:
-            (return) - ROS livox_ros_driver2.msg.CustomMsg message
-        """
-        if not LIVOX_CUSTOM_MSG_AVAILABLE:
-            return None
-
-        point_cloud_airsim = projectairsim_lidar["point_cloud"]
-        intensity_cloud = projectairsim_lidar.get("intensity_cloud", [])
-        ring_cloud = projectairsim_lidar.get("laser_index_cloud", [])
-        num_points = len(point_cloud_airsim) // 3
-
-        timestamp_ns = projectairsim_lidar.get("time_stamp")
-        scan_duration_ns = self._get_lidar_scan_duration_ns(
-            self._last_livox_lidar_stamp_ns_by_topic,
-            projectairsim_topic_name,
-            timestamp_ns,
-        )
-        offset_times_ns = self._get_livox_offset_times_ns(
-            ring_cloud, num_points, scan_duration_ns
-        )
-
-        livox_msg = LivoxCustomMsg()
-        livox_msg.header = rosstdmsg.Header()
-        livox_msg.header.stamp = self._get_stamp_from_projectairsim_msg(
-            projectairsim_lidar
-        )
-        livox_msg.header.frame_id = projectairsim_lidar["frame_id"]
-        livox_msg.timebase = int(timestamp_ns) if timestamp_ns is not None else 0
-        livox_msg.lidar_id = 0
-        livox_msg.point_num = num_points
-
-        points = []
-        for point_index, i in enumerate(range(0, num_points * 3, 3)):
-            point = LivoxCustomPoint()
-            point.offset_time = self._clamp_int(
-                offset_times_ns[point_index], 0, 0xFFFFFFFF
-            )
-            point.x = float(point_cloud_airsim[i])
-            point.y = float(-point_cloud_airsim[i + 1])
-            point.z = float(-point_cloud_airsim[i + 2])
-            point.reflectivity = self._lidar_intensity_to_livox_reflectivity(
-                intensity_cloud[point_index]
-                if point_index < len(intensity_cloud)
-                else 0
-            )
-            point.tag = 0x10
-            point.line = self._clamp_int(
-                ring_cloud[point_index] if point_index < len(ring_cloud) else 0,
-                0,
-                255,
-            )
-            points.append(point)
-
-        livox_msg.points = sorted(points, key=lambda point: point.offset_time)
-
-        return livox_msg
+    # def convert_lidar_to_livox_custom_msg(
+    #     self, projectairsim_topic_name, projectairsim_lidar
+    # ):
+    #     """
+    #     Convert a Project AirSim LIDAR point cloud message into a Livox CustomMsg.
+    #
+    #     This is intended for ROS2 pipelines that consume
+    #     livox_ros_driver2/msg/CustomMsg, such as FAST-LIVO2's Livox input path.
+    #     Project AirSim does not carry per-ray timestamps, so offset_time is
+    #     approximated from the point's sample order within its laser line.
+    #
+    #     Arguments:
+    #         projectairsim_topic_name - The Project AirSim topic name
+    #         projectairsim_lidar - The LIDAR data received from the Project AirSim topic
+    #
+    #     Returns:
+    #         (return) - ROS livox_ros_driver2.msg.CustomMsg message
+    #     """
+    #     if not LIVOX_CUSTOM_MSG_AVAILABLE:
+    #         return None
+    #
+    #     point_cloud_airsim = projectairsim_lidar["point_cloud"]
+    #     intensity_cloud = projectairsim_lidar.get("intensity_cloud", [])
+    #     ring_cloud = projectairsim_lidar.get("laser_index_cloud", [])
+    #     num_points = len(point_cloud_airsim) // 3
+    #
+    #     timestamp_ns = projectairsim_lidar.get("time_stamp")
+    #     scan_duration_ns = self._get_lidar_scan_duration_ns(
+    #         self._last_livox_lidar_stamp_ns_by_topic,
+    #         projectairsim_topic_name,
+    #         timestamp_ns,
+    #     )
+    #     offset_times_ns = self._get_livox_offset_times_ns(
+    #         ring_cloud, num_points, scan_duration_ns
+    #     )
+    #
+    #     livox_msg = LivoxCustomMsg()
+    #     livox_msg.header = rosstdmsg.Header()
+    #     livox_msg.header.stamp = self._get_stamp_from_projectairsim_msg(
+    #         projectairsim_lidar
+    #     )
+    #     livox_msg.header.frame_id = projectairsim_lidar["frame_id"]
+    #     livox_msg.timebase = int(timestamp_ns) if timestamp_ns is not None else 0
+    #     livox_msg.lidar_id = 0
+    #     livox_msg.point_num = num_points
+    #
+    #     points = []
+    #     for point_index, i in enumerate(range(0, num_points * 3, 3)):
+    #         point = LivoxCustomPoint()
+    #         point.offset_time = self._clamp_int(
+    #             offset_times_ns[point_index], 0, 0xFFFFFFFF
+    #         )
+    #         point.x = float(point_cloud_airsim[i])
+    #         point.y = float(-point_cloud_airsim[i + 1])
+    #         point.z = float(-point_cloud_airsim[i + 2])
+    #         point.reflectivity = self._lidar_intensity_to_livox_reflectivity(
+    #             intensity_cloud[point_index]
+    #             if point_index < len(intensity_cloud)
+    #             else 0
+    #         )
+    #         point.tag = 0x10
+    #         point.line = self._clamp_int(
+    #             ring_cloud[point_index] if point_index < len(ring_cloud) else 0,
+    #             0,
+    #             255,
+    #         )
+    #         points.append(point)
+    #
+    #     livox_msg.points = sorted(points, key=lambda point: point.offset_time)
+    #
+    #     return livox_msg
 
     @staticmethod
     def _clamp_int(value, min_value, max_value):
         return int(max(min_value, min(max_value, round(float(value)))))
 
-    @classmethod
-    def _lidar_intensity_to_livox_reflectivity(cls, intensity):
-        intensity = max(float(intensity), 0.0)
-        return cls._clamp_int((intensity / 1.4) * 255.0, 0, 255)
-
-    @staticmethod
-    def _get_livox_offset_times_ns(ring_cloud, num_points, scan_duration_ns):
-        if num_points <= 0:
-            return []
-
-        if len(ring_cloud) >= num_points:
-            ring_counts = {}
-            for point_index in range(num_points):
-                ring = int(ring_cloud[point_index])
-                ring_counts[ring] = ring_counts.get(ring, 0) + 1
-
-            max_ring_count = max(ring_counts.values())
-            if max_ring_count <= 1:
-                return [0.0] * num_points
-
-            ring_seen = {}
-            offset_times_ns = []
-            for point_index in range(num_points):
-                ring = int(ring_cloud[point_index])
-                sample_index = ring_seen.get(ring, 0)
-                ring_seen[ring] = sample_index + 1
-                offset_times_ns.append(
-                    scan_duration_ns * sample_index / (max_ring_count - 1)
-                )
-
-            return offset_times_ns
-
-        return [
-            scan_duration_ns * point_index / (num_points - 1)
-            if num_points > 1
-            else 0.0
-            for point_index in range(num_points)
-        ]
+    # @classmethod
+    # def _lidar_intensity_to_livox_reflectivity(cls, intensity):
+    #     intensity = max(float(intensity), 0.0)
+    #     return cls._clamp_int((intensity / 1.4) * 255.0, 0, 255)
+    #
+    # @staticmethod
+    # def _get_livox_offset_times_ns(ring_cloud, num_points, scan_duration_ns):
+    #     if num_points <= 0:
+    #         return []
+    #
+    #     if len(ring_cloud) >= num_points:
+    #         ring_counts = {}
+    #         for point_index in range(num_points):
+    #             ring = int(ring_cloud[point_index])
+    #             ring_counts[ring] = ring_counts.get(ring, 0) + 1
+    #
+    #         max_ring_count = max(ring_counts.values())
+    #         if max_ring_count <= 1:
+    #             return [0.0] * num_points
+    #
+    #         ring_seen = {}
+    #         offset_times_ns = []
+    #         for point_index in range(num_points):
+    #             ring = int(ring_cloud[point_index])
+    #             sample_index = ring_seen.get(ring, 0)
+    #             ring_seen[ring] = sample_index + 1
+    #             offset_times_ns.append(
+    #                 scan_duration_ns * sample_index / (max_ring_count - 1)
+    #             )
+    #
+    #         return offset_times_ns
+    #
+    #     return [
+    #         scan_duration_ns * point_index / (num_points - 1)
+    #         if num_points > 1
+    #         else 0.0
+    #         for point_index in range(num_points)
+    #     ]
 
     @staticmethod
     def _get_lidar_scan_duration_ns(

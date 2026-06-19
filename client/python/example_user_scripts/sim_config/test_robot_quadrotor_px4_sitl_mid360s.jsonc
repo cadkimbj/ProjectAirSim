@@ -322,17 +322,17 @@
       "type": "camera",
       "enabled": true,
       "parent-link": "Frame",
-      "capture-interval": 0.05,
+      "capture-interval": 0.1,
       "capture-settings": [
         {
           "image-type": 0,
-          "width": 1280,
-          "height": 720,
+          "width": 320,
+          "height": 240,
           "fov-degrees": 90,
           "capture-enabled": false,
           "streaming-enabled": true,
           "pixels-as-float": false,
-          "compress": false,
+          "compress": true,
           "target-gamma": 2.0
         }
       ],
@@ -352,17 +352,17 @@
       "type": "camera",
       "enabled": true,
       "parent-link": "Frame",
-      "capture-interval": 0.033333,
+      "capture-interval": 0.1,
       "capture-settings": [
         {
           "image-type": 0,  // scene camera
-          "width": 640,
-          "height": 480,
+          "width": 1280,
+          "height": 720,
           "fov-degrees": 90,
           "capture-enabled": true,
           "streaming-enabled": true,
           "pixels-as-float": false,
-          "compress": false,
+          "compress": true,
           "target-gamma": 2.0
         }
       ],
@@ -387,7 +387,7 @@
       ],
       "origin": {
         "xyz": "0.4 0.0 0.0",
-        "rpy-deg": "0 -30 0"
+        "rpy-deg": "0 0 0"
       }
     },
     {
@@ -395,7 +395,7 @@
       "type": "camera",
       "enabled": true,
       "parent-link": "Frame",
-      "capture-interval": 0.033333,
+      "capture-interval": 0.1,
       "capture-settings": [
         {
           "image-type": 0,  // scene camera
@@ -450,92 +450,92 @@
         "rpy-deg": "0 -90 0"
       }
     },
-    {
-      "id": "LeftCamera",
-      "type": "camera",
-      "enabled": false,
-      "parent-link": "Frame",
-      "capture-interval": 0.033333,
-      "capture-settings": [
-        {
-          "image-type": 0,  // scene camera
-          "width": 640,
-          "height": 480,
-          "fov-degrees": 79.815,
-          "capture-enabled": true,
-          "streaming-enabled": false,
-          "pixels-as-float": false,
-          "compress": false,
-          "target-gamma": 2.0
-        }
-      ],
-      "noise-settings": [
-        {
-          "enabled": false,
-          "image-type": 0,
-          "rand-contrib": 0.2,
-          "rand-speed": 100000.0,
-          "rand-size": 500.0,
-          "rand-density": 2,
-          "horz-wave-contrib": 0.03,
-          "horz-wave-strength": 0.08,
-          "horz-wave-vert-size": 1.0,
-          "horz-wave-screen-size": 1.0,
-          "horz-noise-lines-contrib": 1.0,
-          "horz-noise-lines-density-y": 0.01,
-          "horz-noise-lines-density-xy": 0.5,
-          "horz-distortion-contrib": 1.0,
-          "horz-distortion-strength": 0.002
-        }
-      ],
-      "origin": {
-        "xyz": "0.4 -0.025 0.0",
-        "rpy-deg": "0 0 0"
-      }
-    },
-    {
-      "id": "RightCamera",
-      "type": "camera",
-      "enabled": false,
-      "parent-link": "Frame",
-      "capture-interval": 0.033333,
-      "capture-settings": [
-        {
-          "image-type": 0,  // scene camera
-          "width": 640,
-          "height": 480,
-          "fov-degrees": 79.815,
-          "capture-enabled": true,
-          "streaming-enabled": false,
-          "pixels-as-float": false,
-          "compress": false,
-          "target-gamma": 2.0
-        }
-      ],
-      "noise-settings": [
-        {
-          "enabled": false,
-          "image-type": 0,
-          "rand-contrib": 0.2,
-          "rand-speed": 100000.0,
-          "rand-size": 500.0,
-          "rand-density": 2,
-          "horz-wave-contrib": 0.03,
-          "horz-wave-strength": 0.08,
-          "horz-wave-vert-size": 1.0,
-          "horz-wave-screen-size": 1.0,
-          "horz-noise-lines-contrib": 1.0,
-          "horz-noise-lines-density-y": 0.01,
-          "horz-noise-lines-density-xy": 0.5,
-          "horz-distortion-contrib": 1.0,
-          "horz-distortion-strength": 0.002
-        }
-      ],
-      "origin": {
-        "xyz": "0.4 0.025 0.0",
-        "rpy-deg": "0 0 0"
-      }
-    },
+    // {
+    //   "id": "LeftCamera",
+    //   "type": "camera",
+    //   "enabled": false,
+    //   "parent-link": "Frame",
+    //   "capture-interval": 0.033333,
+    //   "capture-settings": [
+    //     {
+    //       "image-type": 0,  // scene camera
+    //       "width": 640,
+    //       "height": 480,
+    //       "fov-degrees": 79.815,
+    //       "capture-enabled": true,
+    //       "streaming-enabled": false,
+    //       "pixels-as-float": false,
+    //       "compress": false,
+    //       "target-gamma": 2.0
+    //     }
+    //   ],
+    //   "noise-settings": [
+    //     {
+    //       "enabled": false,
+    //       "image-type": 0,
+    //       "rand-contrib": 0.2,
+    //       "rand-speed": 100000.0,
+    //       "rand-size": 500.0,
+    //       "rand-density": 2,
+    //       "horz-wave-contrib": 0.03,
+    //       "horz-wave-strength": 0.08,
+    //       "horz-wave-vert-size": 1.0,
+    //       "horz-wave-screen-size": 1.0,
+    //       "horz-noise-lines-contrib": 1.0,
+    //       "horz-noise-lines-density-y": 0.01,
+    //       "horz-noise-lines-density-xy": 0.5,
+    //       "horz-distortion-contrib": 1.0,
+    //       "horz-distortion-strength": 0.002
+    //     }
+    //   ],
+    //   "origin": {
+    //     "xyz": "0.4 -0.025 0.0",
+    //     "rpy-deg": "0 0 0"
+    //   }
+    // },
+    // {
+    //   "id": "RightCamera",
+    //   "type": "camera",
+    //   "enabled": false,
+    //   "parent-link": "Frame",
+    //   "capture-interval": 0.033333,
+    //   "capture-settings": [
+    //     {
+    //       "image-type": 0,  // scene camera
+    //       "width": 640,
+    //       "height": 480,
+    //       "fov-degrees": 79.815,
+    //       "capture-enabled": true,
+    //       "streaming-enabled": false,
+    //       "pixels-as-float": false,
+    //       "compress": false,
+    //       "target-gamma": 2.0
+    //     }
+    //   ],
+    //   "noise-settings": [
+    //     {
+    //       "enabled": false,
+    //       "image-type": 0,
+    //       "rand-contrib": 0.2,
+    //       "rand-speed": 100000.0,
+    //       "rand-size": 500.0,
+    //       "rand-density": 2,
+    //       "horz-wave-contrib": 0.03,
+    //       "horz-wave-strength": 0.08,
+    //       "horz-wave-vert-size": 1.0,
+    //       "horz-wave-screen-size": 1.0,
+    //       "horz-noise-lines-contrib": 1.0,
+    //       "horz-noise-lines-density-y": 0.01,
+    //       "horz-noise-lines-density-xy": 0.5,
+    //       "horz-distortion-contrib": 1.0,
+    //       "horz-distortion-strength": 0.002
+    //     }
+    //   ],
+    //   "origin": {
+    //     "xyz": "0.4 0.025 0.0",
+    //     "rpy-deg": "0 0 0"
+    //   }
+    // },
     {
       "id": "IMU1",
       "type": "imu",
@@ -572,7 +572,7 @@
       "vertical-fov-upper-deg": 52,
       "radial-scaling": 1,
       "disable-self-hits": false,
-      "draw-debug-points": true,
+      "draw-debug-points": false,
       "origin": {
         "xyz": "0 0 0.1", // 0 0 0.1
         "rpy-deg": "0 -180 0" // 0 -180 0
